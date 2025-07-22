@@ -197,6 +197,19 @@ body {
     opacity: 1;
     filter: brightness(1.8);
     pointer-events: none;
+    /* Empêcher l'interaction sur mobile */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* Forcer le mode inline sur iOS */
+    -webkit-playsinline: true;
+    /* Empêcher le zoom sur mobile */
+    touch-action: none;
+    /* S'assurer que la vidéo reste en arrière-plan */
+    background-attachment: fixed;
 }
 
 /* Sections avec fond noir - Laissent voir la vidéo en arrière-plan */
@@ -905,14 +918,7 @@ body {
     color: var(--secondary-green);
 }
 
-/* About Video Styles */
-.custom-video-player {
-    position: relative;
-    width: 100%;
-    max-width: 900px;
-    margin: 0 auto;
-}
-
+/* About Video Styles - Contrôles natifs uniquement */
 .about-video {
     width: 100%;
     height: auto;
@@ -923,71 +929,10 @@ body {
     border: 1px solid var(--border-subtle);
 }
 
-.custom-video-player:hover .about-video {
+.about-video:hover {
     transform: scale(1.01);
     border-color: var(--border-muted);
     box-shadow: var(--shadow-lg);
-}
-
-/* Play Button Overlay */
-.play-button-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 2;
-    transition: var(--transition-all);
-}
-
-.custom-play-button {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: rgba(64, 64, 64, 0.9);
-    border: none;
-    color: var(--white);
-    font-size: var(--font-size-2xl);
-    cursor: pointer;
-    transition: var(--transition-all);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-}
-
-.custom-play-button:hover {
-    background: rgba(64, 64, 64, 1);
-    transform: scale(1.1);
-    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
-}
-
-.custom-play-button i {
-    margin-left: 3px; /* Centrage visuel pour l'icône play */
-}
-
-/* Video Time Display */
-.video-time-display {
-    position: absolute;
-    bottom: 15px;
-    right: 15px;
-    background: rgba(0, 0, 0, 0.7);
-    color: var(--white);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    opacity: 0;
-    transition: var(--transition-all);
-    z-index: 3;
-}
-
-.custom-video-player.playing .video-time-display {
-    opacity: 1;
-}
-
-.custom-video-player.playing .play-button-overlay {
-    opacity: 0;
-    pointer-events: none;
 }
 
 /* Pillars Section - Duolingo Style */
@@ -4536,6 +4481,49 @@ a:focus {
         padding-right: var(--space-4);
     }
     
+    /* Forcer la vidéo d'arrière-plan à rester inline sur mobile */
+    #background-video {
+        /* Empêche l'accès aux contrôles vidéo */
+        -webkit-appearance: none;
+        appearance: none;
+        /* Désactive les gestes de pincement */
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        touch-action: none !important;
+        /* Force le z-index négatif */
+        z-index: -10 !important;
+        /* Empêche le débordement */
+        overflow: hidden;
+        /* Position absolue pour certains navigateurs mobiles */
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        /* Empêche la sélection */
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+    }
+    
+    /* S'assurer que le body reste scrollable */
+    body.dashboard-body {
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+    
+    /* Supprimer complètement tous les éléments de lecteur vidéo personnalisé sur mobile */
+    .play-button-overlay,
+    .custom-play-button,
+    .video-time-display,
+    .custom-video-player {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        z-index: -999 !important;
+    }
+    
     .nav-container {
         padding: 0 var(--space-4);
         height: 70px;
@@ -4812,17 +4800,9 @@ a:focus {
         height: auto;
     }
     
-    .custom-play-button {
-        width: 50px;
-        height: 50px;
-        font-size: var(--font-size-lg);
-    }
-    
-    .video-time-display {
-        bottom: 8px;
-        right: 8px;
-        font-size: var(--font-size-xs);
-        padding: var(--space-1) var(--space-2);
+    /* Vidéo About sur mobile - contrôles natifs */
+    .about-video {
+        border-radius: var(--radius-lg);
     }
     
     .community-content {
@@ -6709,5 +6689,33 @@ a:focus {
     
     * {
         box-shadow: none !important;
+    }
+}
+
+/* MOBILE - Extra small screens (320px and below) */
+@media (max-width: 320px) {
+    /* Renforcer les règles vidéo pour les très petits écrans */
+    #background-video {
+        /* Forcer la taille */
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        /* Empêcher tout type d'interaction */
+        pointer-events: none !important;
+        -webkit-touch-callout: none !important;
+        touch-action: none !important;
+    }
+    
+    /* Supprimer complètement le lecteur vidéo personnalisé sur très petits écrans */
+    .play-button-overlay,
+    .custom-play-button,
+    .video-time-display,
+    .custom-video-player {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        z-index: -999 !important;
     }
 }

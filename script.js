@@ -957,81 +957,21 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(element);
     });
 
-    // Custom video player for About section
+    // About video - contrôles natifs uniquement
     const aboutVideo = document.querySelector('.about-video');
-    const customPlayer = document.querySelector('.custom-video-player');
-    const playButton = document.querySelector('.custom-play-button');
-    const playButtonOverlay = document.querySelector('.play-button-overlay');
-    const currentTimeDisplay = document.querySelector('.current-time');
-    const totalTimeDisplay = document.querySelector('.total-time');
-    const videoTimeDisplay = document.querySelector('.video-time-display');
-    
-    if (aboutVideo && customPlayer && playButton) {
-        // Format time in mm:ss
-        function formatTime(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = Math.floor(seconds % 60);
-            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-        }
+    if (aboutVideo) {
+        // Configuration pour mobile - s'assurer que la vidéo utilise les contrôles natifs
+        aboutVideo.setAttribute('playsinline', '');
+        aboutVideo.setAttribute('webkit-playsinline', '');
         
-        // Update time display
-        function updateTimeDisplay() {
-            if (currentTimeDisplay && totalTimeDisplay) {
-                currentTimeDisplay.textContent = formatTime(aboutVideo.currentTime);
-                totalTimeDisplay.textContent = formatTime(aboutVideo.duration);
-            }
-        }
-        
-        // Play button click handler
-        playButton.addEventListener('click', function() {
-            if (aboutVideo.paused) {
-                aboutVideo.play();
-                customPlayer.classList.add('playing');
-                playButtonOverlay.style.opacity = '0';
-                playButtonOverlay.style.pointerEvents = 'none';
-                videoTimeDisplay.style.opacity = '1';
-            }
-        });
-        
-        // Video click handler (pause/resume)
-        aboutVideo.addEventListener('click', function() {
-            if (!aboutVideo.paused) {
-                aboutVideo.pause();
-                customPlayer.classList.remove('playing');
-                playButtonOverlay.style.opacity = '1';
-                playButtonOverlay.style.pointerEvents = 'auto';
-                videoTimeDisplay.style.opacity = '0';
-            } else {
-                aboutVideo.play();
-                customPlayer.classList.add('playing');
-                playButtonOverlay.style.opacity = '0';
-                playButtonOverlay.style.pointerEvents = 'none';
-                videoTimeDisplay.style.opacity = '1';
-            }
-        });
-        
-        // Update time display during playback
-        aboutVideo.addEventListener('timeupdate', updateTimeDisplay);
-        
-        // Set total time when metadata loads
-        aboutVideo.addEventListener('loadedmetadata', function() {
-            console.log('About video loaded successfully');
-            updateTimeDisplay();
-        });
-        
-        // Handle video end
-        aboutVideo.addEventListener('ended', function() {
-            customPlayer.classList.remove('playing');
-            playButtonOverlay.style.opacity = '1';
-            playButtonOverlay.style.pointerEvents = 'auto';
-            videoTimeDisplay.style.opacity = '0';
-            aboutVideo.currentTime = 0;
-            updateTimeDisplay();
-        });
-        
-        // Error handling
+        // Error handling simple
         aboutVideo.addEventListener('error', function() {
             console.error('Error loading about video');
+        });
+        
+        // Log basique quand la vidéo est prête
+        aboutVideo.addEventListener('loadedmetadata', function() {
+            console.log('About video loaded successfully');
         });
     }
 

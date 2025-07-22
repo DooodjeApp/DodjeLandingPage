@@ -797,14 +797,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== GESTION DE LA VIDÉO ====================
     const backgroundVideo = document.getElementById('background-video');
     if (backgroundVideo) {
+        // Configuration spéciale pour mobile
+        backgroundVideo.playsInline = true;
+        backgroundVideo.webkitPlaysInline = true;
+        backgroundVideo.setAttribute('playsinline', '');
+        backgroundVideo.setAttribute('webkit-playsinline', '');
+        
+        // Empêcher le mode plein écran sur mobile
+        backgroundVideo.style.webkitTransform = 'translateZ(0)';
+        backgroundVideo.style.transform = 'translateZ(0)';
+        
+        // Désactiver les contrôles et interactions
+        backgroundVideo.controls = false;
+        backgroundVideo.disablePictureInPicture = true;
+        
+        // Empêcher le clic droit et les interactions
+        backgroundVideo.addEventListener('contextmenu', e => e.preventDefault());
+        backgroundVideo.addEventListener('touchstart', e => e.preventDefault());
+        backgroundVideo.addEventListener('touchend', e => e.preventDefault());
+        
+        // Forcer le redimensionnement correct
+        const resizeVideo = () => {
+            backgroundVideo.style.width = '100vw';
+            backgroundVideo.style.height = '100vh';
+            backgroundVideo.style.objectFit = 'cover';
+        };
+        
+        // Appeler au chargement et redimensionnement
+        backgroundVideo.addEventListener('loadedmetadata', resizeVideo);
+        window.addEventListener('resize', resizeVideo);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeVideo, 100);
+        });
+        
+        // Démarrer la vidéo
         backgroundVideo.play().catch(e => {
             console.log('Autoplay bloqué:', e);
         });
         
+        // Redémarrer la vidéo en boucle
         backgroundVideo.addEventListener('ended', function() {
             this.currentTime = 0;
             this.play();
         });
+        
+        // Surveiller les changements de mode plein écran
+        const exitFullscreenHandler = () => {
+            if (document.fullscreenElement === backgroundVideo || 
+                document.webkitFullscreenElement === backgroundVideo) {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        };
+        
+        backgroundVideo.addEventListener('fullscreenchange', exitFullscreenHandler);
+        backgroundVideo.addEventListener('webkitfullscreenchange', exitFullscreenHandler);
     }
 
     async function toggleInfoPopup() {

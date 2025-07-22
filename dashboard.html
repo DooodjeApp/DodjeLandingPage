@@ -34,7 +34,17 @@
 </head>
 <body class="dashboard-body">
     <!-- Vidéo d'arrière-plan -->
-    <video id="background-video" autoplay muted loop playsinline>
+    <video id="background-video" 
+           autoplay 
+           muted 
+           loop 
+           playsinline
+           webkit-playsinline
+           x-webkit-airplay="deny"
+           disablepictureinpicture
+           controlslist="nodownload nofullscreen noremoteplayback"
+           preload="metadata"
+           poster="">
         <source src="assets/anime/FondAnime.mp4" type="video/mp4">
         Votre navigateur ne supporte pas la vidéo HTML5.
     </video>
