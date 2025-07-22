@@ -45,21 +45,23 @@ const mobileMenuClose = document.getElementById('mobile-menu-close');
 
 // ==================== FONCTION POUR METTRE À JOUR LE MENU MOBILE ====================
 // Fonction pour mettre à jour le menu mobile spécifiquement
-function updateMobileUserInfo(userData) {
+function updateMobileUserInfo(userData, referralsText = null, flappyText = null) {
     console.log('🔄 Mise à jour menu mobile avec:', userData);
     
     const mobileEmailEl = document.getElementById('mobile-user-email');
     const mobileUsernameEl = document.getElementById('mobile-user-username');
     const mobileFounderCodeEl = document.getElementById('mobile-user-founder-code');
     const mobileRegistrationEl = document.getElementById('mobile-user-registration-date');
-    const mobileStatusEl = document.getElementById('mobile-user-status');
+    const mobileReferralsEl = document.getElementById('mobile-user-referrals-info');
+    const mobileFlappyEl = document.getElementById('mobile-user-flappy-info');
     
     console.log('📱 Éléments trouvés:', {
         email: !!mobileEmailEl,
         username: !!mobileUsernameEl,
         founderCode: !!mobileFounderCodeEl,
         registration: !!mobileRegistrationEl,
-        status: !!mobileStatusEl
+        referrals: !!mobileReferralsEl,
+        flappy: !!mobileFlappyEl
     });
     
     if (mobileEmailEl) {
@@ -121,9 +123,15 @@ function updateMobileUserInfo(userData) {
         mobileRegistrationEl.textContent = formattedDate;
         console.log('✅ Date inscription mise à jour:', formattedDate);
     }
-    if (mobileStatusEl) {
-        mobileStatusEl.textContent = 'FONDATEUR';
-        console.log('✅ Statut mis à jour: FONDATEUR');
+    
+    // Nouvelles informations
+    if (mobileReferralsEl && referralsText) {
+        mobileReferralsEl.textContent = referralsText;
+        console.log('✅ Parrainages mis à jour:', referralsText);
+    }
+    if (mobileFlappyEl && flappyText) {
+        mobileFlappyEl.textContent = flappyText;
+        console.log('✅ Flappy Bird mis à jour:', flappyText);
     }
 }
 
@@ -134,7 +142,7 @@ function getUserFromCache() {
 }
 
 // Fonction pour ouvrir le menu mobile
-function openMobileMenu() {
+async function openMobileMenu() {
     mobileMenu.classList.add('active');
     mobileMenuOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -143,7 +151,36 @@ function openMobileMenu() {
     const cachedUser = getUserFromCache();
     if (cachedUser) {
         console.log('🔄 Mise à jour menu mobile à l\'ouverture avec cache:', cachedUser);
-        updateMobileUserInfo(cachedUser);
+        
+        try {
+            // Récupérer les données actualisées depuis Firestore
+            const userDoc = await db.collection('preinscription')
+                .where('email', '==', cachedUser.email)
+                .get();
+
+            if (!userDoc.empty) {
+                const userData = userDoc.docs[0].data();
+                
+                // Calculer les classements pour le mobile
+                const referralsCount = userData.referralsCount || 0;
+                const flappyScore = userData.bestFlappyBirdScore || 0;
+                
+                const referralsRanking = await getReferralsRanking(referralsCount);
+                const mobileMenuReferralsText = `${referralsCount} (${referralsRanking.position}/${referralsRanking.total})`;
+                
+                const flappyRanking = flappyScore > 0 ? await getFlappyRanking(flappyScore) : null;
+                const mobileMenuFlappyText = flappyScore > 0 ? 
+                    `${flappyScore} pts (${flappyRanking.position}/${flappyRanking.total})` : 
+                    'Pas encore joué';
+                
+                updateMobileUserInfo(userData, mobileMenuReferralsText, mobileMenuFlappyText);
+            } else {
+                updateMobileUserInfo(cachedUser);
+            }
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour mobile:', error);
+            updateMobileUserInfo(cachedUser);
+        }
     }
 }
 
@@ -211,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!user || !user.email || !user.username || !user.founderCode) {
                 console.log('Données utilisateur manquantes ou invalides, redirection vers landing page');
                 clearUserCache();
-                window.location.href = 'index.html';
+                window.location.href = '/';
                 return false;
             }
             
@@ -223,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Erreur lors de la vérification auth:', error);
             clearUserCache();
-            window.location.href = 'index.html';
+            window.location.href = '/';
             return false;
         }
     }
@@ -243,10 +280,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const countdownElements = {
             days: document.querySelector('#days-mini'),
             hours: document.querySelector('#hours-mini'),
-            minutes: document.querySelector('#minutes-mini')
+            minutes: document.querySelector('#minutes-mini'),
+            seconds: document.querySelector('#seconds-mini')
         };
 
-        const launchDate = new Date('2025-09-08T16:00:00');
+        const launchDate = new Date('2025-09-24T16:00:00');
         const now = new Date().getTime();
         const distance = launchDate.getTime() - now;
 
@@ -254,10 +292,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const days = Math.floor(distance / (1000 * 60 * 60 * 24));
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
             if (countdownElements.days) countdownElements.days.textContent = days.toString().padStart(2, '0');
             if (countdownElements.hours) countdownElements.hours.textContent = hours.toString().padStart(2, '0');
             if (countdownElements.minutes) countdownElements.minutes.textContent = minutes.toString().padStart(2, '0');
+            if (countdownElements.seconds) countdownElements.seconds.textContent = seconds.toString().padStart(2, '0');
         }
     }
     
@@ -407,6 +447,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // ==================== COMPTEUR DE PRÉINSCRIPTIONS ====================
+    let preregistrationListener = null;
+    
+    function updatePreregistrationCounter(count) {
+        const counterElement = document.getElementById('preregistration-count');
+        if (counterElement) {
+            // Mise à jour directe sans animation
+            counterElement.textContent = count.toLocaleString('fr-FR');
+        }
+    }
+    
+    function startPreregistrationListener() {
+        try {
+            // Écouter les changements en temps réel sur la collection 'preinscription'
+            preregistrationListener = db.collection('preinscription').onSnapshot(
+                (snapshot) => {
+                    const count = snapshot.size;
+                    console.log('👥 Mise à jour du compteur de préinscriptions:', count);
+                    updatePreregistrationCounter(count);
+                },
+                (error) => {
+                    console.error('❌ Erreur dans l\'écoute temps réel des préinscriptions:', error);
+                    // En cas d'erreur, essayer de récupérer le count une seule fois
+                    getTotalUsers().then(count => {
+                        updatePreregistrationCounter(count);
+                    });
+                }
+            );
+            
+            console.log('🔄 Écoute temps réel des préinscriptions activée');
+        } catch (error) {
+            console.error('❌ Erreur lors du démarrage de l\'écoute temps réel:', error);
+            // Fallback: récupérer le count une seule fois
+            getTotalUsers().then(count => {
+                updatePreregistrationCounter(count);
+            });
+        }
+    }
+    
+    function stopPreregistrationListener() {
+        if (preregistrationListener) {
+            preregistrationListener();
+            preregistrationListener = null;
+            console.log('🛑 Écoute temps réel des préinscriptions arrêtée');
+        }
+    }
+    
     async function getUserRank(referralsCount) {
         try {
             // Obtenir tous les utilisateurs avec leurs compteurs stockés
@@ -437,6 +524,91 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // ==================== FONCTIONS POUR CLASSEMENTS ====================
+    async function getReferralsRanking(userReferrals) {
+        try {
+            const allUsers = await db.collection('preinscription').get();
+            const referralCounts = [];
+            
+            allUsers.forEach(doc => {
+                const userData = doc.data();
+                // Inclure tous les utilisateurs avec un code fondateur, même ceux à 0
+                if (userData.generatedFounderCode) {
+                    const userReferralsCount = userData.referralsCount || 0;
+                    referralCounts.push(userReferralsCount);
+                }
+            });
+            
+            // Trier par ordre décroissant
+            referralCounts.sort((a, b) => b - a);
+            
+            console.log('📊 Distribution des parrainages:', referralCounts);
+            
+            // Pour l'utilisateur à 0, trouver sa position parmi tous les 0
+            if (userReferrals === 0) {
+                // Compter combien ont plus de 0 parrainages
+                const betterThanZero = referralCounts.filter(count => count > 0).length;
+                const totalUsers = referralCounts.length;
+                
+                // Position = nombre de personnes avec plus de parrainages + 1
+                const position = betterThanZero + 1;
+                
+                console.log(`📍 Classement à 0: ${position}/${totalUsers} (${betterThanZero} personnes ont plus de parrainages)`);
+                
+                return {
+                    position: position,
+                    total: totalUsers
+                };
+            } else {
+                // Pour les autres, trouver la position normale
+                const userPosition = referralCounts.findIndex(count => count <= userReferrals) + 1;
+                const totalUsers = referralCounts.length;
+                
+                console.log(`📍 Classement à ${userReferrals}: ${userPosition}/${totalUsers}`);
+                
+                return {
+                    position: userPosition || totalUsers,
+                    total: totalUsers
+                };
+            }
+        } catch (error) {
+            console.error('Erreur lors du calcul du classement parrainages:', error);
+            return { position: 1, total: 1 };
+        }
+    }
+    
+    async function getFlappyRanking(userScore) {
+        try {
+            const allUsers = await db.collection('preinscription')
+                .where('bestFlappyBirdScore', '>', 0)
+                .get();
+                
+            const scores = [];
+            allUsers.forEach(doc => {
+                const userData = doc.data();
+                const score = userData.bestFlappyBirdScore || 0;
+                if (score > 0) {
+                    scores.push(score);
+                }
+            });
+            
+            // Trier par ordre décroissant
+            scores.sort((a, b) => b - a);
+            
+            // Trouver la position de l'utilisateur
+            const userPosition = scores.findIndex(score => score <= userScore) + 1;
+            const totalPlayers = scores.length;
+            
+            return {
+                position: userPosition || totalPlayers, // Si pas trouvé, mettre à la fin
+                total: totalPlayers
+            };
+        } catch (error) {
+            console.error('Erreur lors du calcul du classement Flappy:', error);
+            return { position: 1, total: 1 };
+        }
+    }
+    
     // ==================== MISE À JOUR DE L'INTERFACE ====================
     async function updateUserInfo(user) {
         try {
@@ -455,11 +627,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('user-founder-code-popup').textContent = userData.generatedFounderCode || '--';
                 document.getElementById('user-registration-date').textContent = formatDate(userData.timestamp);
                 
+                // Calcul des classements
+                const referralsCount = userData.referralsCount || 0;
+                const flappyScore = userData.bestFlappyBirdScore || 0;
+                
+                // Classement parrainages (toujours calculer, même pour 0)
+                const referralsRanking = await getReferralsRanking(referralsCount);
+                const referralsText = `${referralsCount} (${referralsRanking.position}/${referralsRanking.total})`;
+                document.getElementById('user-referrals-info').textContent = referralsText;
+                
+                // Classement Flappy Bird
+                const flappyRanking = flappyScore > 0 ? await getFlappyRanking(flappyScore) : null;
+                const flappyText = flappyScore > 0 ? 
+                    `${flappyScore} pts (${flappyRanking.position}/${flappyRanking.total})` : 
+                    'Pas encore joué';
+                document.getElementById('user-flappy-info').textContent = flappyText;
+                
                 // Mise à jour des informations dans le menu mobile
-                updateMobileUserInfo(userData);
+                updateMobileUserInfo(userData, referralsText, flappyText);
                 
                 // Statistiques
-                const referralsCount = userData.referralsCount || 0;
                 document.getElementById('referrals-count').innerHTML = `<span class="count-number">${referralsCount}</span>`;
                 
                 // Mise à jour de la passe de combat
@@ -467,7 +654,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Rang
                 const rank = await getUserRank(referralsCount);
-                document.getElementById('rank-percentage').textContent = rank;
+                const rankElement = document.getElementById('rank-percentage');
+                if (rankElement) {
+                    rankElement.textContent = rank;
+                }
                 
                 // Barre de progression (basée sur le rang)
                 const progressFill = document.getElementById('progress-fill');
@@ -593,7 +783,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     window.logout = function() {
         clearUserCache();
-        window.location.href = 'index.html';
+        window.location.href = '/';
     };
     
     // Fonction utilitaire pour déboguer le cache
@@ -617,9 +807,77 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function toggleInfoPopup() {
+    async function toggleInfoPopup() {
         const popup = document.getElementById('infoPopup');
+        const isOpening = !popup.classList.contains('active');
+        
+        if (isOpening) {
+            // Mettre à jour les informations quand on ouvre la popup
+            const user = getUserFromCache();
+            if (user) {
+                await updateUserInfoForPopup(user);
+            }
+        }
+        
         popup.classList.toggle('active');
+    }
+
+    // ==================== MISE À JOUR POPUP INFO ====================
+    async function updateUserInfoForPopup(user) {
+        try {
+            console.log('🔄 Mise à jour popup info pour:', user.email);
+            
+            // Récupérer les données actualisées depuis Firestore
+            const userDoc = await db.collection('preinscription')
+                .where('email', '==', user.email)
+                .get();
+
+            if (!userDoc.empty) {
+                const userData = userDoc.docs[0].data();
+                console.log('📊 Données utilisateur récupérées:', userData);
+                
+                // Informations de base
+                document.getElementById('user-email').textContent = userData.email || '--';
+                document.getElementById('user-username').textContent = userData.username || '--';
+                document.getElementById('user-founder-code-popup').textContent = userData.generatedFounderCode || '--';
+                document.getElementById('user-registration-date').textContent = formatDate(userData.timestamp);
+                
+                // Calcul des classements
+                const referralsCount = userData.referralsCount || 0;
+                const flappyScore = userData.bestFlappyBirdScore || 0;
+                
+                console.log('📈 Stats utilisateur:', { referralsCount, flappyScore });
+                
+                // Classement parrainages (toujours calculer, même pour 0)
+                const referralsRanking = await getReferralsRanking(referralsCount);
+                const popupReferralsText = `${referralsCount} (${referralsRanking.position}/${referralsRanking.total})`;
+                document.getElementById('user-referrals-info').textContent = popupReferralsText;
+                console.log('✅ Parrainages popup mis à jour:', popupReferralsText);
+                
+                // Classement Flappy Bird
+                if (flappyScore > 0) {
+                    const flappyRanking = await getFlappyRanking(flappyScore);
+                    const flappyText = `${flappyScore} pts (${flappyRanking.position}/${flappyRanking.total})`;
+                    document.getElementById('user-flappy-info').textContent = flappyText;
+                    console.log('✅ Flappy Bird popup mis à jour:', flappyText);
+                } else {
+                    document.getElementById('user-flappy-info').textContent = 'Pas encore joué';
+                    console.log('✅ Pas encore joué à Flappy Bird');
+                }
+                
+            } else {
+                console.log('❌ Aucun document utilisateur trouvé');
+            }
+        } catch (error) {
+            console.error('❌ Erreur lors de la mise à jour popup info:', error);
+            
+            // Fallback avec les données du cache
+            document.getElementById('user-email').textContent = user.email || '--';
+            document.getElementById('user-username').textContent = user.username || '--';
+            document.getElementById('user-founder-code-popup').textContent = user.founderCode || '--';
+            document.getElementById('user-referrals-info').textContent = '--';
+            document.getElementById('user-flappy-info').textContent = '--';
+        }
     }
 
     // Rendre la fonction accessible globalement
@@ -632,6 +890,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!popup.contains(e.target) && !infoButton.contains(e.target) && popup.classList.contains('active')) {
             popup.classList.remove('active');
+        }
+    });
+    
+    // ==================== NETTOYAGE ====================
+    // Nettoyer les listeners quand l'utilisateur quitte la page
+    window.addEventListener('beforeunload', () => {
+        stopPreregistrationListener();
+    });
+    
+    // Nettoyer aussi quand la page devient invisible (onglet en arrière-plan)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopPreregistrationListener();
+        } else {
+            // Redémarrer quand la page redevient visible
+            setTimeout(() => {
+                startPreregistrationListener();
+            }, 1000);
         }
     });
     
@@ -664,8 +940,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('user-founder-code-popup').textContent = userData.generatedFounderCode || '--';
                 document.getElementById('user-registration-date').textContent = formatDate(userData.timestamp);
 
-                // Mettre à jour les statistiques et le passe de combat
+                // Calcul des classements pour la popup info
                 const referralsCount = userData.referralsCount || 0;
+                const flappyScore = userData.bestFlappyBirdScore || 0;
+                
+                console.log('📊 Calcul classements - Parrainages:', referralsCount, 'Flappy:', flappyScore);
+
+                // Classement parrainages (toujours calculer, même pour 0)
+                const referralsRanking = await getReferralsRanking(referralsCount);
+                const referralsText = `${referralsCount} (${referralsRanking.position}/${referralsRanking.total})`;
+                document.getElementById('user-referrals-info').textContent = referralsText;
+                console.log('✅ Parrainages init:', referralsText);
+                
+                // Classement Flappy Bird
+                if (flappyScore > 0) {
+                    const flappyRanking = await getFlappyRanking(flappyScore);
+                    const flappyText = `${flappyScore} pts (${flappyRanking.position}/${flappyRanking.total})`;
+                    document.getElementById('user-flappy-info').textContent = flappyText;
+                    console.log('✅ Flappy Bird init:', flappyText);
+                } else {
+                    document.getElementById('user-flappy-info').textContent = 'Pas encore joué';
+                }
+
+                // Mise à jour du menu mobile avec les classements
+                const mobileReferralsText = document.getElementById('user-referrals-info').textContent;
+                const mobileFlappyText = document.getElementById('user-flappy-info').textContent;
+                updateMobileUserInfo(userData, mobileReferralsText, mobileFlappyText);
+
                 console.log('Nombre de parrainages:', referralsCount);
 
                 // Mettre à jour le score d'avancement
@@ -716,7 +1017,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Démarrer le countdown
             updateCountdown();
-            setInterval(updateCountdown, 60000); // Mise à jour chaque minute
+            setInterval(updateCountdown, 1000); // Mise à jour chaque seconde
+
+            // Démarrer l'écoute en temps réel du compteur de préinscriptions
+            startPreregistrationListener();
 
             console.log('🚀 Dashboard Dodje chargé avec succès');
         } catch (error) {
@@ -815,8 +1119,8 @@ document.addEventListener('DOMContentLoaded', function() {
             width: 30,
             height: 30,
             velocity: 0,
-            gravity: 0.5,
-            jump: -10,
+            gravity: 0.4,
+            jump: -9,
             color: '#06D001'
         },
         pipes: [],
@@ -894,7 +1198,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createPipe() {
-        const gap = 150;
+        // Calcul de la difficulté basée sur le score
+        const difficulty = getDifficultySettings(gameState.score);
+        
+        const gap = difficulty.gap;
         const minHeight = 50;
         const maxHeight = gameState.canvas.height - gap - minHeight;
         const height = Math.random() * (maxHeight - minHeight) + minHeight;
@@ -905,7 +1212,38 @@ document.addEventListener('DOMContentLoaded', function() {
             bottomY: height + gap,
             bottomHeight: gameState.canvas.height - (height + gap),
             width: 50,
-            passed: false
+            passed: false,
+            speed: difficulty.pipeSpeed // Ajouter la vitesse individuelle
+        };
+    }
+
+    // Fonction pour calculer les paramètres de difficulté basés sur le score
+    function getDifficultySettings(score) {
+        // Vitesse de base des tuyaux
+        const basePipeSpeed = 2.5;
+        // Augmentation de la vitesse tous les 5 points (max +2.5)
+        const speedIncrease = Math.min(2.5, Math.floor(score / 5) * 0.3);
+        
+        // Gap de base entre les tuyaux
+        const baseGap = 180;
+        // Réduction du gap tous les 10 points (max -30 pixels)
+        const gapReduction = Math.min(30, Math.floor(score / 10) * 5);
+        
+        // Fréquence de base d'apparition (tous les 110 frames)
+        const baseFrequency = 110;
+        // Augmentation de la fréquence tous les 8 points (max -30 frames)
+        const frequencyReduction = Math.min(30, Math.floor(score / 8) * 4);
+        
+        // Gravité de base
+        const baseGravity = 0.4;
+        // Augmentation de la gravité tous les 15 points (max +0.15)
+        const gravityIncrease = Math.min(0.15, Math.floor(score / 15) * 0.02);
+        
+        return {
+            pipeSpeed: basePipeSpeed + speedIncrease,
+            gap: baseGap - gapReduction,
+            spawnFrequency: baseFrequency - frequencyReduction,
+            gravity: baseGravity + gravityIncrease
         };
     }
 
@@ -914,18 +1252,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         gameState.frameCount++;
         
-        // Mise à jour de l'oiseau
-        gameState.bird.velocity += gameState.bird.gravity;
+        // Calculer la difficulté actuelle
+        const difficulty = getDifficultySettings(gameState.score);
+        
+        // Mise à jour de l'oiseau avec gravité progressive
+        gameState.bird.velocity += difficulty.gravity;
         gameState.bird.y += gameState.bird.velocity;
         
-        // Générer des tuyaux
-        if (gameState.frameCount % 90 === 0) {
+        // Générer des tuyaux avec fréquence variable
+        if (gameState.frameCount % difficulty.spawnFrequency === 0) {
             gameState.pipes.push(createPipe());
         }
         
-        // Mise à jour des tuyaux
+        // Mise à jour des tuyaux avec vitesse individuelle
         gameState.pipes = gameState.pipes.filter(pipe => {
-            pipe.x -= 3;
+            // Utiliser la vitesse individuelle du tuyau ou la vitesse actuelle si pas définie
+            const pipeSpeed = pipe.speed || difficulty.pipeSpeed;
+            pipe.x -= pipeSpeed;
             
             // Vérifier le score
             if (!pipe.passed && pipe.x + pipe.width < gameState.bird.x) {
@@ -1258,6 +1601,81 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // ==================== REFERRALS LEADERBOARD FUNCTIONS ====================
+    async function loadReferralsLeaderboard() {
+        try {
+            const referralsQuery = await db.collection('preinscription')
+                .where('referralsCount', '>', 0)
+                .orderBy('referralsCount', 'desc')
+                .limit(50) // Limiter à 50 pour les performances
+                .get();
+            
+            const referrals = [];
+            referralsQuery.forEach(doc => {
+                const data = doc.data();
+                referrals.push({
+                    username: data.username,
+                    referralsCount: data.referralsCount,
+                    email: data.email
+                });
+            });
+            
+            return referrals;
+        } catch (error) {
+            console.error('Erreur lors du chargement du leaderboard des parrainages:', error);
+            return [];
+        }
+    }
+
+    async function displayReferralsLeaderboard() {
+        const leaderboardLoading = document.getElementById('referralsLeaderboardLoading');
+        const leaderboardList = document.getElementById('referralsLeaderboardList');
+        
+        leaderboardLoading.style.display = 'block';
+        leaderboardList.innerHTML = '';
+        
+        try {
+            const referrals = await loadReferralsLeaderboard();
+            const currentUser = getUserFromCache();
+            
+            leaderboardLoading.style.display = 'none';
+            
+            if (referrals.length === 0) {
+                leaderboardList.innerHTML = '<div class="leaderboard-empty">Aucun parrainage enregistré</div>';
+                return;
+            }
+            
+            referrals.forEach((referral, index) => {
+                const item = document.createElement('div');
+                item.className = 'leaderboard-item';
+                
+                if (currentUser && referral.email === currentUser.email) {
+                    item.classList.add('current-user');
+                }
+                
+                const rank = index + 1;
+                let rankClass = '';
+                if (rank === 1) rankClass = 'gold';
+                else if (rank === 2) rankClass = 'silver';
+                else if (rank === 3) rankClass = 'bronze';
+                
+                const plural = referral.referralsCount > 1 ? 's' : '';
+                
+                item.innerHTML = `
+                    <span class="leaderboard-rank ${rankClass}">${rank}</span>
+                    <span class="leaderboard-username">${referral.username}</span>
+                    <span class="leaderboard-score">${referral.referralsCount} parrainage${plural}</span>
+                `;
+                
+                leaderboardList.appendChild(item);
+            });
+            
+        } catch (error) {
+            leaderboardLoading.style.display = 'none';
+            leaderboardList.innerHTML = '<div class="leaderboard-error">Erreur lors du chargement</div>';
+        }
+    }
+
     async function displayLeaderboard() {
         const leaderboardLoading = document.getElementById('leaderboardLoading');
         const leaderboardList = document.getElementById('leaderboardList');
@@ -1323,22 +1741,51 @@ document.addEventListener('DOMContentLoaded', function() {
         leaderboardPopup.style.display = 'none';
     };
 
-    // Fermer la popup en cliquant en dehors
+    // ==================== REFERRALS LEADERBOARD POPUP FUNCTIONS ====================
+    window.toggleReferralsLeaderboard = function() {
+        const referralsLeaderboardPopup = document.getElementById('referralsLeaderboardPopup');
+        
+        // Afficher la popup
+        referralsLeaderboardPopup.style.display = 'flex';
+        
+        // Charger les données
+        displayReferralsLeaderboard();
+    };
+
+    window.closeReferralsLeaderboard = function() {
+        const referralsLeaderboardPopup = document.getElementById('referralsLeaderboardPopup');
+        
+        referralsLeaderboardPopup.style.display = 'none';
+    };
+
+    // Fermer les popups en cliquant en dehors
     document.addEventListener('click', function(e) {
         const leaderboardPopup = document.getElementById('leaderboardPopup');
-        const popupContent = document.querySelector('.leaderboard-popup-content');
+        const referralsLeaderboardPopup = document.getElementById('referralsLeaderboardPopup');
         
-        if (e.target === leaderboardPopup && !popupContent.contains(e.target)) {
+        // Fermer popup du jeu
+        if (e.target === leaderboardPopup) {
             closeLeaderboard();
+        }
+        
+        // Fermer popup des parrainages
+        if (e.target === referralsLeaderboardPopup) {
+            closeReferralsLeaderboard();
         }
     });
 
-    // Fermer la popup avec la touche Échap
+    // Fermer les popups avec la touche Échap
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             const leaderboardPopup = document.getElementById('leaderboardPopup');
+            const referralsLeaderboardPopup = document.getElementById('referralsLeaderboardPopup');
+            
             if (leaderboardPopup.style.display === 'flex') {
                 closeLeaderboard();
+            }
+            
+            if (referralsLeaderboardPopup.style.display === 'flex') {
+                closeReferralsLeaderboard();
             }
         }
     });
@@ -1381,4 +1828,824 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Démarrer l'application
     init();
+});
+
+// ==================== SHARE FUNCTIONALITY ====================
+
+// Variables globales pour le partage
+let shareData = {
+    username: '',
+    founderCode: '',
+    referralsCount: 0,
+    flappyScore: 0
+};
+
+// Fonction pour ouvrir/fermer la popup de partage
+async function toggleShareCard() {
+    const sharePopup = document.getElementById('sharePopup');
+    const isOpening = !sharePopup.classList.contains('active');
+    
+    // Si on ouvre la popup de partage depuis le menu mobile, fermer le menu mobile
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+    if (isOpening && mobileMenu && mobileMenu.classList.contains('active')) {
+        console.log('🔄 Fermeture du menu mobile avant ouverture popup partage');
+        mobileMenu.classList.remove('active');
+        mobileMenuOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    
+    if (isOpening) {
+        sharePopup.style.display = 'flex';
+        
+        // Essayer de récupérer les données depuis la popup info si elle a déjà été ouverte
+        const existingReferrals = document.getElementById('user-referrals-info')?.textContent;
+        const existingFlappy = document.getElementById('user-flappy-info')?.textContent;
+        
+        console.log('🔍 Données existantes popup info:', { existingReferrals, existingFlappy });
+        
+        // Initialiser avec des données par défaut avant de récupérer les vraies données
+        const user = getUserFromCache();
+        if (user) {
+            shareData.username = user.username || 'Gland Anonyme';
+            shareData.founderCode = user.generatedFounderCode || user.founderCode || 'N/A';
+            
+            // Si les données de la popup info existent, les extraire avec classements
+            if (existingReferrals && existingReferrals !== '--') {
+                const referralsMatch = existingReferrals.match(/^(\d+)/);
+                shareData.referralsCount = referralsMatch ? parseInt(referralsMatch[1]) : 0;
+                shareData.referralsRanking = existingReferrals; // Garder le texte complet avec classement
+            } else {
+                shareData.referralsCount = 0;
+                shareData.referralsRanking = '0';
+            }
+            
+            if (existingFlappy && existingFlappy !== '--' && existingFlappy !== 'Pas encore joué') {
+                const flappyMatch = existingFlappy.match(/^(\d+) pts/);
+                shareData.flappyScore = flappyMatch ? parseInt(flappyMatch[1]) : 0;
+                shareData.flappyRanking = existingFlappy; // Garder le texte complet avec classement
+            } else {
+                shareData.flappyScore = 0;
+                shareData.flappyRanking = 'Pas encore joué';
+            }
+            
+            console.log('📊 Données initiales extraites:', shareData);
+            updateShareCardDisplay();
+        }
+        
+        // S'assurer que les données utilisateur sont chargées
+        if (user && (!existingReferrals || existingReferrals === '--')) {
+            console.log('🔄 Forcer le chargement initial des données utilisateur...');
+            // Au lieu d'appeler updateUserInfoForPopup, on va juste forcer updateShareDataFromSameSource
+        }
+        
+        // Mettre à jour les données de partage depuis Firestore
+        await updateShareDataFromSameSource();
+        
+        // Ouvrir la popup avec animation
+        setTimeout(() => {
+            sharePopup.classList.add('active');
+        }, 10);
+    } else {
+        // Fermer la popup avec animation
+        sharePopup.classList.remove('active');
+        setTimeout(() => {
+            sharePopup.style.display = 'none';
+        }, 300);
+    }
+}
+
+// Fonction pour mettre à jour les données de partage
+async function updateShareData() {
+    try {
+        const user = getUserFromCache();
+        if (!user) {
+            console.log('❌ Aucun utilisateur en cache');
+            return;
+        }
+
+        console.log('🔄 Mise à jour des données de partage...', user);
+        
+        // Récupérer les données actualisées depuis Firestore
+        const userDoc = await db.collection('preinscription')
+            .where('email', '==', user.email)
+            .get();
+
+        if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            console.log('📋 Données Firestore récupérées complètes:', userData);
+            console.log('🔍 Clés disponibles dans userData:', Object.keys(userData));
+            
+            // Mettre à jour shareData en cherchant tous les noms de champs possibles
+            shareData.username = userData.username || user.username || 'Gland Anonyme';
+            shareData.founderCode = userData.generatedFounderCode || userData.founderCode || user.generatedFounderCode || user.founderCode || 'N/A';
+            
+            // Chercher le nombre de parrainages sous différents noms
+            shareData.referralsCount = userData.referralsCount || userData.referrals || userData.parrainagesCount || userData.parrainages || 0;
+            
+            // Chercher le score Flappy sous différents noms  
+            shareData.flappyScore = userData.bestFlappyBirdScore || userData.flappyScore || userData.bestScore || userData.maxScore || userData.flappyBirdScore || 0;
+            
+            console.log('📊 Données de partage mises à jour depuis Firestore:', shareData);
+            console.log('🎯 Champs testés pour parrainages:', {
+                referralsCount: userData.referralsCount,
+                referrals: userData.referrals,
+                parrainagesCount: userData.parrainagesCount,
+                parrainages: userData.parrainages
+            });
+            console.log('🎮 Champs testés pour Flappy:', {
+                bestFlappyBirdScore: userData.bestFlappyBirdScore,
+                flappyScore: userData.flappyScore,
+                bestScore: userData.bestScore,
+                maxScore: userData.maxScore,
+                flappyBirdScore: userData.flappyBirdScore
+            });
+            
+            // Mettre à jour l'affichage dans la card de partage
+            updateShareCardDisplay();
+        } else {
+            console.log('❌ Aucun document utilisateur trouvé, utilisation des données du cache');
+            // Utiliser les données du cache si disponibles
+            shareData.username = user.username || 'Gland Anonyme';
+            shareData.founderCode = user.generatedFounderCode || user.founderCode || 'N/A';
+            shareData.referralsCount = user.referralsCount || 0;
+            shareData.flappyScore = user.bestFlappyBirdScore || user.flappyScore || 0;
+            
+            console.log('📊 Données de partage mises à jour depuis le cache:', shareData);
+            updateShareCardDisplay();
+        }
+    } catch (error) {
+        console.error('❌ Erreur lors de la mise à jour des données de partage:', error);
+        
+        // Fallback avec les données du cache
+        const user = getUserFromCache();
+        if (user) {
+            shareData.username = user.username || 'Gland Anonyme';
+            shareData.founderCode = user.generatedFounderCode || user.founderCode || 'N/A';
+            shareData.referralsCount = 0;
+            shareData.flappyScore = 0;
+            updateShareCardDisplay();
+        }
+    }
+}
+
+// Fonction pour mettre à jour l'affichage de la card de partage
+function updateShareCardDisplay() {
+    console.log('🔄 Mise à jour affichage card avec:', shareData);
+    
+    const usernameEl = document.getElementById('share-username');
+    const referralsEl = document.getElementById('share-referrals');
+    const flappyEl = document.getElementById('share-flappy-score');
+    const founderCodeEl = document.getElementById('share-founder-code');
+    
+    console.log('🎯 Éléments DOM trouvés:', {
+        username: !!usernameEl,
+        referrals: !!referralsEl,
+        flappy: !!flappyEl,
+        founderCode: !!founderCodeEl
+    });
+    
+    if (usernameEl) {
+        usernameEl.textContent = shareData.username || 'Utilisateur';
+        console.log('✅ Username mis à jour:', shareData.username);
+    }
+    if (referralsEl) {
+        const referralsText = shareData.referralsRanking || shareData.referralsCount || '0';
+        referralsEl.textContent = referralsText;
+        console.log('✅ Parrainages mis à jour:', referralsText);
+    }
+    if (flappyEl) {
+        const flappyText = shareData.flappyRanking || (shareData.flappyScore === 0 ? 'Pas encore joué' : `${shareData.flappyScore} pts`);
+        flappyEl.textContent = flappyText;
+        console.log('✅ Flappy score mis à jour:', flappyText);
+    }
+    if (founderCodeEl) {
+        founderCodeEl.textContent = shareData.founderCode || 'N/A';
+        console.log('✅ Code fondateur mis à jour:', shareData.founderCode);
+    }
+    
+    console.log('✅ Affichage card mis à jour complètement');
+}
+
+// Fonction pour mettre à jour les données de partage avec la même logique que la popup info
+async function updateShareDataFromSameSource() {
+    try {
+        const user = getUserFromCache();
+        if (!user) {
+            console.log('❌ Aucun utilisateur en cache pour le partage');
+            return;
+        }
+
+        console.log('🔄 Mise à jour données partage avec même source que popup info...', user.email);
+        
+        // Utiliser exactement la même requête que updateUserInfoForPopup
+        const userDoc = await db.collection('preinscription')
+            .where('email', '==', user.email)
+            .get();
+
+        if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            console.log('📋 Données Firestore pour partage (même source):', userData);
+            
+            // Utiliser exactement les mêmes champs que updateUserInfoForPopup
+            shareData.username = userData.username || user.username || 'Gland Anonyme';
+            shareData.founderCode = userData.generatedFounderCode || user.generatedFounderCode || user.founderCode || 'N/A';
+            
+            // Récupérer les scores bruts
+            const referralsCount = userData.referralsCount || 0;
+            const flappyScore = userData.bestFlappyBirdScore || 0;
+            
+            console.log('📈 Stats brutes:', { referralsCount, flappyScore });
+            
+            // Calculer les classements comme dans updateUserInfoForPopup
+            const referralsRanking = await getReferralsRanking(referralsCount);
+            shareData.referralsCount = referralsCount;
+            shareData.referralsRanking = `${referralsCount} (${referralsRanking.position}/${referralsRanking.total})`;
+            
+            if (flappyScore > 0) {
+                const flappyRanking = await getFlappyRanking(flappyScore);
+                shareData.flappyScore = flappyScore;
+                shareData.flappyRanking = `${flappyScore} pts (${flappyRanking.position}/${flappyRanking.total})`;
+            } else {
+                shareData.flappyScore = 0;
+                shareData.flappyRanking = 'Pas encore joué';
+            }
+            
+            console.log('📊 Données de partage avec classements:', shareData);
+            
+            // Mettre à jour l'affichage
+            updateShareCardDisplay();
+        } else {
+            console.log('❌ Aucun document utilisateur trouvé pour le partage');
+            // Garder les données déjà extraites de la popup info si disponibles
+        }
+    } catch (error) {
+        console.error('❌ Erreur lors de la mise à jour partage (même source):', error);
+        // Garder les données déjà extraites de la popup info si disponibles
+    }
+}
+
+// Fonction principale de partage en tant qu'image
+async function shareAsImage(platform) {
+    try {
+        console.log(`📸 Génération de l'image pour ${platform}...`);
+        showLoadingFeedback(platform);
+        
+        // Créer une image de la card
+        const canvas = await generateShareImage();
+        
+        // Convertir le canvas en blob
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], `dodje-stats-${shareData.username}.png`, { type: 'image/png' });
+            
+            // Essayer le partage natif moderne d'abord (iOS/Android)
+            if (await tryNativeShare(file, platform)) {
+                hideLoadingFeedback(platform);
+                return;
+            }
+            
+            // Copier l'image dans le presse-papier si possible
+            await copyImageToClipboard(canvas, platform);
+            
+            // Ouvrir directement le réseau social avec instructions
+            await openSocialWithInstructions(platform, blob);
+            
+            hideLoadingFeedback(platform);
+            
+        }, 'image/png');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors du partage:', error);
+        hideLoadingFeedback(platform);
+        showErrorMessage('Erreur lors de la génération de l\'image. Veuillez réessayer.');
+    }
+}
+
+// Essayer le partage natif moderne
+async function tryNativeShare(file, platform) {
+    if (!navigator.share) return false;
+    
+    try {
+        // Vérifier si le partage de fichiers est supporté
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            const shareText = generatePlatformSpecificText(platform);
+            await navigator.share({
+                title: 'Mes stats Dodje',
+                text: shareText,
+                files: [file]
+            });
+            console.log('✅ Partage natif réussi !');
+            return true;
+        }
+        
+        // Fallback : partage texte seulement si fichiers non supportés
+        const shareText = generatePlatformSpecificText(platform);
+        await navigator.share({
+            title: 'Mes stats Dodje',
+            text: shareText + '\n\n🖼️ Image disponible dans le presse-papier',
+            url: 'https://dodje.xyz'
+        });
+        console.log('✅ Partage texte natif réussi !');
+        return true;
+        
+    } catch (error) {
+        console.log('🔄 Partage natif échoué:', error);
+        return false;
+    }
+}
+
+// Copier l'image dans le presse-papier si possible
+async function copyImageToClipboard(canvas, platform) {
+    try {
+        // Vérifier si l'API Clipboard est disponible
+        if (!navigator.clipboard || !navigator.clipboard.write) {
+            console.log('📋 API Clipboard non disponible');
+            return false;
+        }
+        
+        // Convertir le canvas en blob
+        return new Promise((resolve) => {
+            canvas.toBlob(async (blob) => {
+                try {
+                    const clipboardItem = new ClipboardItem({ 'image/png': blob });
+                    await navigator.clipboard.write([clipboardItem]);
+                    console.log('✅ Image copiée dans le presse-papier !');
+                    
+                    // Feedback visuel rapide
+                    showToast(`📋 Image copiée ! Ouvre ${getPlatformName(platform)} et colle-la`);
+                    resolve(true);
+                } catch (error) {
+                    console.log('📋 Échec copie presse-papier:', error);
+                    resolve(false);
+                }
+            }, 'image/png');
+        });
+        
+    } catch (error) {
+        console.log('📋 Erreur presse-papier:', error);
+        return false;
+    }
+}
+
+// Ouvrir le réseau social avec instructions optimisées
+async function openSocialWithInstructions(platform, blob) {
+    const shareText = generatePlatformSpecificText(platform);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    switch (platform) {
+        case 'twitter':
+            await handleTwitterShare(shareText, isMobile, blob);
+            break;
+            
+        case 'discord':
+            await handleDiscordShare(isMobile, blob);
+            break;
+            
+        case 'instagram':
+            await handleInstagramShare(isMobile, blob);
+            break;
+    }
+}
+
+// Gestion spécifique Twitter
+async function handleTwitterShare(shareText, isMobile, blob) {
+    const encodedText = encodeURIComponent(shareText);
+    
+    // Toujours ouvrir Twitter avec le texte pré-rempli
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}`;
+    
+    if (isMobile) {
+        // Sur mobile, essayer l'app d'abord
+        try {
+            window.location.href = `twitter://post?message=${encodedText}`;
+            // Fallback web après délai
+            setTimeout(() => {
+                window.open(twitterUrl, '_blank');
+            }, 1500);
+        } catch {
+            window.open(twitterUrl, '_blank');
+        }
+    } else {
+        // Desktop : ouvrir directement
+        window.open(twitterUrl, '_blank');
+    }
+    
+         // Instructions claires
+     showInstructionModal('Twitter', 
+         '📝 Texte pré-rempli !', 
+         isMobile ? 
+         'Le texte est prêt. Clique sur l\'icône photo/média pour ajouter l\'image depuis ton presse-papier ou galerie.' :
+         'Le texte est prêt. Utilise Ctrl+V pour coller ton image, ou clique sur l\'icône photo pour l\'ajouter.'
+     );
+}
+
+// Gestion spécifique Discord  
+async function handleDiscordShare(isMobile, blob) {
+    if (isMobile) {
+        try {
+            // Essayer d'ouvrir l'app Discord
+            window.location.href = 'discord://';
+            setTimeout(() => {
+                window.open('https://discord.com/channels/@me', '_blank');
+            }, 1500);
+        } catch {
+            window.open('https://discord.com/channels/@me', '_blank');
+        }
+    } else {
+        // Desktop : ouvrir Discord web directement
+        window.open('https://discord.com/channels/@me', '_blank');
+    }
+    
+    showInstructionModal('Discord',
+        '🎮 Prêt à partager !',
+        isMobile ?
+        'Va dans ton serveur ou conversation. L\'image est dans ton presse-papier - colle-la avec un appui long ou utilise l\'icône +.' :
+        'Va dans ton serveur ou conversation. Utilise Ctrl+V pour coller l\'image ou clique sur + pour l\'ajouter.'
+    );
+}
+
+// Gestion spécifique Instagram
+async function handleInstagramShare(isMobile, blob) {
+    if (isMobile) {
+        try {
+            // Essayer d'ouvrir la caméra Instagram pour story
+            window.location.href = 'instagram://camera';
+            setTimeout(() => {
+                window.open('https://www.instagram.com/', '_blank');
+            }, 1500);
+        } catch {
+            window.open('https://www.instagram.com/', '_blank');
+        }
+        
+        showInstructionModal('Instagram',
+            '📸 Prêt pour ta story !',
+            'L\'image est dans ton presse-papier. Va dans tes stories, clique sur l\'icône galerie et sélectionne ton image.'
+        );
+    } else {
+        // Desktop : télécharger l'image d'abord
+        downloadImageForDesktop(blob, 'instagram');
+        
+        setTimeout(() => {
+            window.open('https://www.instagram.com/', '_blank');
+        }, 1000);
+        
+        showInstructionModal('Instagram', 
+            '💻 Image téléchargée !',
+            'L\'image a été téléchargée. Va sur Instagram web et utilise-la pour créer ton post ou story.'
+        );
+    }
+}
+
+// Fonctions utilitaires pour le partage
+function getPlatformName(platform) {
+    switch (platform) {
+        case 'twitter': return 'Twitter';
+        case 'discord': return 'Discord';
+        case 'instagram': return 'Instagram';
+        default: return platform;
+    }
+}
+
+function generatePlatformSpecificText(platform) {
+    const referralsText = shareData.referralsRanking || `${shareData.referralsCount} parrainages`;
+    const flappyText = shareData.flappyRanking || (shareData.flappyScore === 0 ? 'pas encore joué' : `${shareData.flappyScore} pts`);
+    
+    switch (platform) {
+        case 'twitter':
+            return `🌰 Mes stats #Dodje !
+👥 ${referralsText}  
+🎮 Flappy Dodje: ${flappyText}
+👑 Code: ${shareData.founderCode}
+
+Rejoins-moi sur dodje.xyz ! 🚀 #FinanceSimple`;
+
+        case 'discord':
+            return `**🌰 Mes stats Dodje !**
+👥 Parrainages: **${referralsText}**
+🎮 Flappy Dodje: **${flappyText}**
+👑 Code fondateur: \`${shareData.founderCode}\`
+
+Rejoins-moi sur **dodje.xyz** ! 🚀`;
+
+        case 'instagram':
+            return `🌰 Mes stats Dodje !
+👥 ${referralsText}
+🎮 ${flappyText}  
+👑 ${shareData.founderCode}
+
+Rejoins-moi ! 🚀
+#Dodje #Finance #Stats`;
+
+        default:
+            return generateSimpleShareText();
+    }
+}
+
+// Toast notification simple
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #06D001, #9BEC00);
+        color: #000000;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        z-index: 10002;
+        box-shadow: 0 4px 15px rgba(6, 208, 1, 0.3);
+        font-size: 14px;
+        max-width: 300px;
+        font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Animation d'entrée
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Animation de sortie et suppression
+    setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Modal d'instructions avancée
+function showInstructionModal(platform, title, message) {
+    // Supprimer toute modal existante
+    const existingModal = document.getElementById('shareInstructionModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'shareInstructionModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10003;
+        backdrop-filter: blur(5px);
+        animation: fadeIn 0.3s ease;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: linear-gradient(135deg, #001122, #002244);
+        border: 2px solid #06D001;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 400px;
+        margin: 1rem;
+        text-align: center;
+        color: #F3FF90;
+        box-shadow: 0 20px 40px rgba(6, 208, 1, 0.2);
+    `;
+    
+    modalContent.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 1rem;">
+            ${platform === 'twitter' ? '🐦' : platform === 'discord' ? '🎮' : '📸'}
+        </div>
+        <h3 style="color: #06D001; margin: 0 0 1rem 0; font-size: 1.5rem;">${title}</h3>
+        <p style="line-height: 1.6; margin-bottom: 2rem; color: #F3FF90;">${message}</p>
+        <button id="closeInstructionModal" style="
+            background: linear-gradient(135deg, #06D001, #9BEC00);
+            color: #000000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s ease;
+        ">Compris !</button>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Styles d'animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        #closeInstructionModal:hover {
+            transform: scale(1.05);
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Event listeners
+    document.getElementById('closeInstructionModal').addEventListener('click', () => {
+        modal.remove();
+        style.remove();
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+            style.remove();
+        }
+    });
+    
+    // Auto-fermeture après 10 secondes
+    setTimeout(() => {
+        if (modal.parentNode) {
+            modal.remove();
+            style.remove();
+        }
+    }, 10000);
+}
+
+// Téléchargement pour desktop
+function downloadImageForDesktop(blob, platform) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `dodje-stats-${shareData.username}-${platform}.png`;
+    link.href = url;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+// Feedback de chargement sur les boutons
+function showLoadingFeedback(platform) {
+    const button = document.querySelector(`.share-btn.${platform}`);
+    if (button) {
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Préparation...';
+        button.disabled = true;
+    }
+}
+
+function hideLoadingFeedback(platform) {
+    const button = document.querySelector(`.share-btn.${platform}`);
+    if (button && button.dataset.originalText) {
+        button.innerHTML = button.dataset.originalText;
+        button.disabled = false;
+        delete button.dataset.originalText;
+    }
+}
+
+// Message d'erreur amélioré
+function showErrorMessage(message) {
+    showToast(`❌ ${message}`);
+}
+
+// Générer l'image de la card de partage
+async function generateShareImage() {
+    try {
+        // Utiliser html2canvas pour convertir la card en image
+        const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
+        
+        // Capturer uniquement la card (le carré)
+        const shareCard = document.getElementById('shareCard');
+        
+        console.log('📸 Capture de la card uniquement...');
+        
+        // Options simples
+        const options = {
+            backgroundColor: null,
+            scale: 2,
+            logging: false,
+            useCORS: true,
+            allowTaint: true
+        };
+        
+        // Générer le canvas
+        const canvas = await html2canvas(shareCard, options);
+        
+        console.log('✅ Card capturée:', canvas.width, 'x', canvas.height);
+        
+        return canvas;
+        
+    } catch (error) {
+        console.error('❌ Erreur génération image:', error);
+        throw error;
+    }
+}
+
+// Générer un texte de partage simplifié
+function generateSimpleShareText() {
+    const referralsText = shareData.referralsRanking || `${shareData.referralsCount} parrainages`;
+    const flappyText = shareData.flappyRanking || (shareData.flappyScore === 0 ? 'pas encore joué' : `${shareData.flappyScore} pts`);
+    
+    return `🌰 Mes stats Dodje !
+👥 ${referralsText}
+🎮 Flappy Dodje: ${flappyText}
+👑 Code fondateur: ${shareData.founderCode}
+
+Rejoins-moi sur dodje.xyz ! 🚀
+#Dodje #FinanceSimple`;
+}
+
+// Fonction pour télécharger la card comme image
+async function downloadShareCard() {
+    try {
+        console.log('📥 Téléchargement de l\'image...');
+        
+        // Générer l'image de la card
+        const canvas = await generateShareImage();
+        
+        // Télécharger l'image
+        const link = document.createElement('a');
+        link.download = `dodje-stats-${shareData.username}.png`;
+        link.href = canvas.toDataURL('image/png');
+        
+        // Déclencher le téléchargement
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('✅ Image téléchargée avec succès !');
+        
+        // Feedback visuel avec notification
+        showPlatformMessage('Téléchargement', 'Image sauvegardée avec succès !');
+        
+        // Feedback visuel sur le bouton
+        const downloadBtn = document.querySelector('.share-btn.download');
+        if (downloadBtn) {
+            const originalText = downloadBtn.innerHTML;
+            downloadBtn.innerHTML = '<i class="fas fa-check"></i> Téléchargé !';
+            downloadBtn.style.background = 'linear-gradient(135deg, #06D001, #9BEC00)';
+            downloadBtn.style.color = '#000000';
+            
+            setTimeout(() => {
+                downloadBtn.innerHTML = originalText;
+                downloadBtn.style.background = '';
+                downloadBtn.style.color = '';
+            }, 2500);
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur lors du téléchargement:', error);
+        showPlatformMessage('Erreur', 'Impossible de télécharger l\'image. Réessayez.');
+    }
+}
+
+// Fonction de debug pour vérifier les données utilisateur
+window.debugUserData = async function() {
+    const user = getUserFromCache();
+    if (!user) {
+        console.log('❌ Aucun utilisateur en cache');
+        return;
+    }
+    
+    console.log('👤 Utilisateur en cache:', user);
+    
+    try {
+        const userDoc = await db.collection('preinscription')
+            .where('email', '==', user.email)
+            .get();
+
+        if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            console.log('📋 Données Firestore complètes:', userData);
+            console.log('🔍 Toutes les clés disponibles:', Object.keys(userData));
+            console.log('📊 referralsCount:', userData.referralsCount);
+            console.log('🎮 bestFlappyBirdScore:', userData.bestFlappyBirdScore);
+        } else {
+            console.log('❌ Aucun document trouvé dans Firestore');
+        }
+    } catch (error) {
+        console.error('❌ Erreur:', error);
+    }
+};
+
+
+
+// Rendre les fonctions accessibles globalement
+window.toggleShareCard = toggleShareCard;
+window.shareAsImage = shareAsImage;
+window.downloadShareCard = downloadShareCard;
+
+// Fermer la popup de partage en cliquant en dehors
+document.addEventListener('click', (e) => {
+    const sharePopup = document.getElementById('sharePopup');
+    const shareButton = document.querySelector('.share-button');
+    
+    if (sharePopup && !sharePopup.querySelector('.share-popup-content').contains(e.target) && 
+        !shareButton?.contains(e.target) && sharePopup.classList.contains('active')) {
+        toggleShareCard();
+    }
 }); 

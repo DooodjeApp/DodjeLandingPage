@@ -1,6 +1,39 @@
 // Simple and clean interactions inspired by Hackathon.dev
 
 document.addEventListener('DOMContentLoaded', function() {
+    // ==================== COUNTDOWN TIMER ====================
+    // Simple countdown timer (placé en premier pour éviter les interférences)
+    function updateCountdown() {
+        const countdownElements = {
+            days: document.querySelector('#days'),
+            hours: document.querySelector('#hours'),
+            minutes: document.querySelector('#minutes'),
+            seconds: document.querySelector('#seconds')
+        };
+
+        // Set launch date to September 24, 2025 at 4 PM
+        const launchDate = new Date('2025-09-24T16:00:00');
+
+        const now = new Date().getTime();
+        const distance = launchDate.getTime() - now;
+
+        if (distance > 0) {
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            if (countdownElements.days) countdownElements.days.textContent = days.toString().padStart(2, '0');
+            if (countdownElements.hours) countdownElements.hours.textContent = hours.toString().padStart(2, '0');
+            if (countdownElements.minutes) countdownElements.minutes.textContent = minutes.toString().padStart(2, '0');
+            if (countdownElements.seconds) countdownElements.seconds.textContent = seconds.toString().padStart(2, '0');
+        }
+    }
+
+    // Démarrer le countdown immédiatement
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+
     // ==================== GESTION DU CACHE ====================
     function getUserFromCache() {
         const userData = localStorage.getItem('dodje_user');
@@ -897,37 +930,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Simple countdown timer
-    function updateCountdown() {
-        const countdownElements = {
-            days: document.querySelector('#days'),
-            hours: document.querySelector('#hours'),
-            minutes: document.querySelector('#minutes'),
-            seconds: document.querySelector('#seconds')
-        };
 
-        // Set launch date to September 8, 2025 at 4 PM
-        const launchDate = new Date('2025-09-08T16:00:00');
-
-        const now = new Date().getTime();
-        const distance = launchDate.getTime() - now;
-
-        if (distance > 0) {
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-            if (countdownElements.days) countdownElements.days.textContent = days.toString().padStart(2, '0');
-            if (countdownElements.hours) countdownElements.hours.textContent = hours.toString().padStart(2, '0');
-            if (countdownElements.minutes) countdownElements.minutes.textContent = minutes.toString().padStart(2, '0');
-            if (countdownElements.seconds) countdownElements.seconds.textContent = seconds.toString().padStart(2, '0');
-        }
-    }
-
-    // Update countdown every second
-    updateCountdown();
-    setInterval(updateCountdown, 1000);
 
     // Intersection Observer for fade-in animations
     const observerOptions = {
