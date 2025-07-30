@@ -154,12 +154,10 @@ async function openMobileMenu() {
         
         try {
             // Récupérer les données actualisées depuis Firestore
-            const userDoc = await db.collection('preinscription')
-                .where('email', '==', cachedUser.email)
-                .get();
+            const userDoc = await db.collection('preinscription_public').doc(cachedUser.username).get();
 
-            if (!userDoc.empty) {
-                const userData = userDoc.docs[0].data();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
                 
                 // Calculer les classements pour le mobile
                 const referralsCount = userData.referralsCount || 0;
@@ -228,6 +226,35 @@ document.addEventListener('DOMContentLoaded', function() {
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     
+    // ==================== CHARGEMENT IMMÉDIAT DU COMPTEUR ====================
+    // Charger le compteur dès que Firebase est prêt (avant toute autre logique)
+    async function loadPreregistrationCountImmediate() {
+        try {
+            const snapshot = await db.collection('preinscription_public').get();
+            const count = snapshot.size;
+            const counterElement = document.getElementById('preregistration-count');
+            if (counterElement) {
+                counterElement.textContent = count.toLocaleString('fr-FR');
+                console.log('✅ Compteur chargé immédiatement:', count);
+            } else {
+                console.log('⚠️ Élément compteur pas encore disponible, retry dans 100ms');
+                // Retry si l'élément n'est pas encore dans le DOM
+                setTimeout(() => {
+                    const retryElement = document.getElementById('preregistration-count');
+                    if (retryElement) {
+                        retryElement.textContent = count.toLocaleString('fr-FR');
+                        console.log('✅ Compteur chargé au retry:', count);
+                    }
+                }, 100);
+            }
+        } catch (error) {
+            console.error('❌ Erreur chargement compteur immédiat:', error);
+        }
+    }
+    
+    // Lancer le chargement immédiatement
+    loadPreregistrationCountImmediate();
+    
         // ==================== GESTION DU CACHE ====================
     function saveUserToCache(userData) {
         localStorage.setItem('dodje_user', JSON.stringify(userData));
@@ -276,30 +303,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function updateCountdown() {
-        const countdownElements = {
-            days: document.querySelector('#days-mini'),
-            hours: document.querySelector('#hours-mini'),
-            minutes: document.querySelector('#minutes-mini'),
-            seconds: document.querySelector('#seconds-mini')
-        };
+    // Fonction globale pour le countdown
+    window.updateCountdown = function() {
+        try {
+            const countdownElements = {
+                days: document.querySelector('#days-mini'),
+                hours: document.querySelector('#hours-mini'),
+                minutes: document.querySelector('#minutes-mini'),
+                seconds: document.querySelector('#seconds-mini')
+            };
 
-        const launchDate = new Date('2025-09-24T16:00:00');
-        const now = new Date().getTime();
-        const distance = launchDate.getTime() - now;
+            // Vérifier que tous les éléments existent
+            if (!countdownElements.days || !countdownElements.hours || 
+                !countdownElements.minutes || !countdownElements.seconds) {
+                console.warn('⚠️ Éléments du countdown manquants');
+                return;
+            }
 
-        if (distance > 0) {
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            const launchDate = new Date('2025-09-24T16:00:00');
+            const now = new Date().getTime();
+            const distance = launchDate.getTime() - now;
 
-            if (countdownElements.days) countdownElements.days.textContent = days.toString().padStart(2, '0');
-            if (countdownElements.hours) countdownElements.hours.textContent = hours.toString().padStart(2, '0');
-            if (countdownElements.minutes) countdownElements.minutes.textContent = minutes.toString().padStart(2, '0');
-            if (countdownElements.seconds) countdownElements.seconds.textContent = seconds.toString().padStart(2, '0');
+            if (distance > 0) {
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                countdownElements.days.textContent = days.toString().padStart(2, '0');
+                countdownElements.hours.textContent = hours.toString().padStart(2, '0');
+                countdownElements.minutes.textContent = minutes.toString().padStart(2, '0');
+                countdownElements.seconds.textContent = seconds.toString().padStart(2, '0');
+            } else {
+                // Si la date est dépassée
+                countdownElements.days.textContent = '00';
+                countdownElements.hours.textContent = '00';
+                countdownElements.minutes.textContent = '00';
+                countdownElements.seconds.textContent = '00';
+            }
+        } catch (error) {
+            console.error('❌ Erreur dans updateCountdown:', error);
         }
-    }
+    };
     
     // ==================== SYSTÈME DE NIVEAUX ====================
     const BATTLE_PASS_LEVELS = [
@@ -412,25 +457,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== GESTION DES STATISTIQUES ====================
     async function getReferralsCount(founderCode) {
         try {
-            // Méthode 1: Utiliser le compteur stocké (plus rapide)
-            const ownerQuery = await db.collection('preinscription')
-                .where('generatedFounderCode', '==', founderCode)
-                .get();
-            
-            if (!ownerQuery.empty) {
-                const ownerData = ownerQuery.docs[0].data();
-                const storedCount = ownerData.referralsCount || 0;
-                console.log(`Compteur stocké pour ${founderCode}: ${storedCount}`);
-                return storedCount;
+                    const query = await db.collection('preinscription_public')
+            .where('generatedFounderCode', '==', founderCode)
+            .get();
+
+            if (!query.empty) {
+                const userData = query.docs[0].data();
+                return userData.referralsCount || 0;
             }
-            
-            // Méthode 2: Fallback - compter manuellement (au cas où)
-            const query = await db.collection('preinscription')
-                .where('founderCodeUsed', '==', founderCode)
-                .get();
-            
-            console.log(`Comptage manuel pour ${founderCode}: ${query.size}`);
-            return query.size;
+            return 0;
         } catch (error) {
             console.error('Erreur lors de la récupération des parrainages:', error);
             return 0;
@@ -439,8 +474,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     async function getTotalUsers() {
         try {
-            const query = await db.collection('preinscription').get();
-            return query.size;
+            const snapshot = await db.collection('preinscription_public').get();
+            return snapshot.size || 1;
         } catch (error) {
             console.error('Erreur lors de la récupération du total des utilisateurs:', error);
             return 1;
@@ -453,37 +488,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function updatePreregistrationCounter(count) {
         const counterElement = document.getElementById('preregistration-count');
         if (counterElement) {
-            // Mise à jour directe sans animation
             counterElement.textContent = count.toLocaleString('fr-FR');
         }
     }
     
     function startPreregistrationListener() {
-        try {
-            // Écouter les changements en temps réel sur la collection 'preinscription'
-            preregistrationListener = db.collection('preinscription').onSnapshot(
-                (snapshot) => {
-                    const count = snapshot.size;
-                    console.log('👥 Mise à jour du compteur de préinscriptions:', count);
-                    updatePreregistrationCounter(count);
-                },
-                (error) => {
-                    console.error('❌ Erreur dans l\'écoute temps réel des préinscriptions:', error);
-                    // En cas d'erreur, essayer de récupérer le count une seule fois
-                    getTotalUsers().then(count => {
-                        updatePreregistrationCounter(count);
-                    });
-                }
-            );
-            
-            console.log('🔄 Écoute temps réel des préinscriptions activée');
-        } catch (error) {
-            console.error('❌ Erreur lors du démarrage de l\'écoute temps réel:', error);
-            // Fallback: récupérer le count une seule fois
-            getTotalUsers().then(count => {
-                updatePreregistrationCounter(count);
+        preregistrationListener = db.collection('preinscription_public')
+            .onSnapshot((snapshot) => {
+                updatePreregistrationCounter(snapshot.size);
             });
-        }
     }
     
     function stopPreregistrationListener() {
@@ -496,115 +509,88 @@ document.addEventListener('DOMContentLoaded', function() {
     
     async function getUserRank(referralsCount) {
         try {
-            // Obtenir tous les utilisateurs avec leurs compteurs stockés
-            const allUsers = await db.collection('preinscription').get();
-            const referralCounts = [];
+            const snapshot = await db.collection('preinscription_public').get();
             
-            // Utiliser les compteurs stockés (plus rapide)
-            allUsers.forEach(doc => {
-                const userData = doc.data();
-                if (userData.generatedFounderCode) {
-                    const userReferrals = userData.referralsCount || 0;
-                    referralCounts.push(userReferrals);
+            if (snapshot.empty) return 100;
+            
+            const allCounts = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.generatedFounderCode) {
+                    allCounts.push(data.referralsCount || 0);
                 }
             });
             
-            // Calculer le rang
-            const betterThanCount = referralCounts.filter(count => count < referralsCount).length;
-            const totalUsers = referralCounts.length;
+            if (allCounts.length === 0) return 100;
             
-            if (totalUsers === 0) return 100;
+            const betterThanCount = allCounts.filter(count => count < referralsCount).length;
+            const rankPercentage = Math.round((betterThanCount / allCounts.length) * 100);
             
-            const rankPercentage = Math.round((betterThanCount / totalUsers) * 100);
-            console.log(`Rang calculé: ${rankPercentage}% (${betterThanCount}/${totalUsers} utilisateurs dépassés)`);
-            return Math.max(rankPercentage, 1); // Minimum 1%
+            return Math.max(rankPercentage, 1);
         } catch (error) {
             console.error('Erreur lors du calcul du rang:', error);
-            return 50; // Valeur par défaut
+            return 50;
         }
     }
     
     // ==================== FONCTIONS POUR CLASSEMENTS ====================
     async function getReferralsRanking(userReferrals) {
         try {
-            const allUsers = await db.collection('preinscription').get();
-            const referralCounts = [];
-            
-            allUsers.forEach(doc => {
-                const userData = doc.data();
-                // Inclure tous les utilisateurs avec un code fondateur, même ceux à 0
-                if (userData.generatedFounderCode) {
-                    const userReferralsCount = userData.referralsCount || 0;
-                    referralCounts.push(userReferralsCount);
-                }
+            // Récupérer TOUS les utilisateurs, pas seulement ceux avec referralsCount > 0
+            const snapshot = await db.collection('preinscription_public').get();
+
+            const allCounts = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // Inclure tous les utilisateurs avec leur nombre de parrainages (0 par défaut)
+                allCounts.push(data.referralsCount || 0);
             });
+
+            // Trier du plus grand au plus petit
+            allCounts.sort((a, b) => b - a);
             
-            // Trier par ordre décroissant
-            referralCounts.sort((a, b) => b - a);
-            
-            console.log('📊 Distribution des parrainages:', referralCounts);
-            
-            // Pour l'utilisateur à 0, trouver sa position parmi tous les 0
-            if (userReferrals === 0) {
-                // Compter combien ont plus de 0 parrainages
-                const betterThanZero = referralCounts.filter(count => count > 0).length;
-                const totalUsers = referralCounts.length;
-                
-                // Position = nombre de personnes avec plus de parrainages + 1
-                const position = betterThanZero + 1;
-                
-                console.log(`📍 Classement à 0: ${position}/${totalUsers} (${betterThanZero} personnes ont plus de parrainages)`);
-                
-                return {
-                    position: position,
-                    total: totalUsers
-                };
-            } else {
-                // Pour les autres, trouver la position normale
-                const userPosition = referralCounts.findIndex(count => count <= userReferrals) + 1;
-                const totalUsers = referralCounts.length;
-                
-                console.log(`📍 Classement à ${userReferrals}: ${userPosition}/${totalUsers}`);
-                
-                return {
-                    position: userPosition || totalUsers,
-                    total: totalUsers
-                };
+            if (allCounts.length === 0) {
+                return { position: 1, total: 1 };
             }
+
+            // Trouver la position de l'utilisateur
+            const position = allCounts.findIndex(count => count <= userReferrals) + 1;
+            
+            return {
+                position: position > 0 ? position : allCounts.length,
+                total: allCounts.length
+            };
         } catch (error) {
-            console.error('Erreur lors du calcul du classement parrainages:', error);
+            console.error('Erreur lors du calcul du rang parrainages:', error);
             return { position: 1, total: 1 };
         }
     }
     
     async function getFlappyRanking(userScore) {
         try {
-            const allUsers = await db.collection('preinscription')
+            const snapshot = await db.collection('preinscription_public')
                 .where('bestFlappyBirdScore', '>', 0)
                 .get();
-                
-            const scores = [];
-            allUsers.forEach(doc => {
-                const userData = doc.data();
-                const score = userData.bestFlappyBirdScore || 0;
-                if (score > 0) {
-                    scores.push(score);
-                }
+
+            const allScores = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                allScores.push(data.bestFlappyBirdScore || 0);
             });
+
+            allScores.sort((a, b) => b - a);
             
-            // Trier par ordre décroissant
-            scores.sort((a, b) => b - a);
-            
-            // Trouver la position de l'utilisateur
-            const userPosition = scores.findIndex(score => score <= userScore) + 1;
-            const totalPlayers = scores.length;
-            
+            if (allScores.length === 0) {
+                return { position: 1, total: 1 };
+            }
+
+            const position = allScores.findIndex(score => score <= userScore) + 1;
             return {
-                position: userPosition || totalPlayers, // Si pas trouvé, mettre à la fin
-                total: totalPlayers
+                position: position || allScores.length + 1,
+                total: allScores.length
             };
         } catch (error) {
-            console.error('Erreur lors du calcul du classement Flappy:', error);
+            console.error('Erreur lors du calcul du rang Flappy:', error);
             return { position: 1, total: 1 };
         }
     }
@@ -613,15 +599,13 @@ document.addEventListener('DOMContentLoaded', function() {
     async function updateUserInfo(user) {
         try {
             // Récupérer les données directement depuis Firestore
-            const userDoc = await db.collection('preinscription')
-                .where('email', '==', user.email)
-                .get();
+            const userDoc = await db.collection('preinscription_public').doc(user.username).get();
 
-            if (!userDoc.empty) {
-                const userData = userDoc.docs[0].data();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
                 
                 // Informations de base
-                document.getElementById('user-email').textContent = userData.email || '--';
+                document.getElementById('user-email').textContent = user.email || '--'; // Email depuis le cache
                 document.getElementById('user-username').textContent = userData.username || '--';
                 document.getElementById('user-founder-code').textContent = userData.generatedFounderCode || '--';
                 document.getElementById('user-founder-code-popup').textContent = userData.generatedFounderCode || '--';
@@ -793,6 +777,31 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('localStorage dodje_user:', localStorage.getItem('dodje_user'));
         return user;
     };
+
+    // Fonction utilitaire pour redémarrer le countdown
+    window.restartCountdown = function() {
+        try {
+            if (window.countdownInterval) {
+                clearInterval(window.countdownInterval);
+                console.log('🛑 Ancien timer arrêté');
+            }
+            
+            updateCountdown();
+            window.countdownInterval = setInterval(() => {
+                try {
+                    updateCountdown();
+                } catch (error) {
+                    console.error('❌ Erreur dans le timer countdown:', error);
+                }
+            }, 1000);
+            
+            console.log('✅ Countdown redémarré avec succès');
+            return true;
+        } catch (error) {
+            console.error('❌ Erreur lors du redémarrage du countdown:', error);
+            return false;
+        }
+    };
     
     // ==================== GESTION DE LA VIDÉO ====================
     const backgroundVideo = document.getElementById('background-video');
@@ -878,16 +887,14 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🔄 Mise à jour popup info pour:', user.email);
             
             // Récupérer les données actualisées depuis Firestore
-            const userDoc = await db.collection('preinscription')
-                .where('email', '==', user.email)
-                .get();
+            const userDoc = await db.collection('preinscription_public').doc(user.username).get();
 
-            if (!userDoc.empty) {
-                const userData = userDoc.docs[0].data();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
                 console.log('📊 Données utilisateur récupérées:', userData);
                 
                 // Informations de base
-                document.getElementById('user-email').textContent = userData.email || '--';
+                document.getElementById('user-email').textContent = user.email || '--'; // Email depuis le cache
                 document.getElementById('user-username').textContent = userData.username || '--';
                 document.getElementById('user-founder-code-popup').textContent = userData.generatedFounderCode || '--';
                 document.getElementById('user-registration-date').textContent = formatDate(userData.timestamp);
@@ -976,15 +983,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Récupérer les données utilisateur depuis Firestore
-            const userDoc = await db.collection('preinscription')
-                .where('email', '==', user.email)
-                .get();
+            const userDoc = await db.collection('preinscription_public').doc(user.username).get();
 
-            if (!userDoc.empty) {
-                const userData = userDoc.docs[0].data();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
                 
                 // Mettre à jour les informations de base
-                document.getElementById('user-email').textContent = userData.email || '--';
+                document.getElementById('user-email').textContent = user.email || '--'; // Email depuis le cache
                 document.getElementById('user-username').textContent = userData.username || '--';
                 document.getElementById('user-founder-code').textContent = userData.generatedFounderCode || '--';
                 document.getElementById('user-founder-code-popup').textContent = userData.generatedFounderCode || '--';
@@ -1065,16 +1070,54 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Démarrer le countdown
-            updateCountdown();
-            setInterval(updateCountdown, 1000); // Mise à jour chaque seconde
+            // Démarrer le countdown avec gestion d'erreur
+            try {
+                updateCountdown();
+                // Utiliser une variable globale pour pouvoir arrêter/redémarrer le timer si nécessaire
+                if (window.countdownInterval) {
+                    clearInterval(window.countdownInterval);
+                }
+                window.countdownInterval = setInterval(() => {
+                    try {
+                        updateCountdown();
+                    } catch (error) {
+                        console.error('❌ Erreur dans le timer countdown:', error);
+                        // Redémarrer le timer après une erreur
+                        setTimeout(() => {
+                            if (!window.countdownInterval) {
+                                window.countdownInterval = setInterval(updateCountdown, 1000);
+                            }
+                        }, 2000);
+                    }
+                }, 1000);
+                console.log('⏰ Countdown démarré avec succès');
+            } catch (error) {
+                console.error('❌ Erreur lors du démarrage du countdown:', error);
+            }
 
-            // Démarrer l'écoute en temps réel du compteur de préinscriptions
+            // Démarrer l'écoute en temps réel du compteur (chargement initial déjà fait)
             startPreregistrationListener();
 
             console.log('🚀 Dashboard Dodje chargé avec succès');
+            
+            // Vérification supplémentaire que le countdown fonctionne après 3 secondes
+            setTimeout(() => {
+                if (!window.countdownInterval) {
+                    console.warn('⚠️ Countdown non démarré, tentative de redémarrage...');
+                    window.restartCountdown();
+                }
+            }, 3000);
+            
         } catch (error) {
             console.error('Erreur lors de l\'initialisation:', error);
+            // Essayer de démarrer au moins le countdown même si le reste échoue
+            setTimeout(() => {
+                try {
+                    window.restartCountdown();
+                } catch (err) {
+                    console.error('❌ Impossible de démarrer le countdown:', err);
+                }
+            }, 1000);
         }
     }
 
@@ -1551,20 +1594,13 @@ document.addEventListener('DOMContentLoaded', function() {
     async function saveBestScoreToFirebase(score) {
         try {
             const user = getUserFromCache();
-            if (!user || !user.email) return;
+            if (!user || !user.username) return;
             
-            const userDoc = await db.collection('preinscription')
-                .where('email', '==', user.email)
-                .get();
-            
-            if (!userDoc.empty) {
-                const docId = userDoc.docs[0].id;
-                await db.collection('preinscription').doc(docId).update({
-                    bestFlappyBirdScore: score,
-                    lastGamePlayed: new Date().toISOString()
-                });
-                console.log('Score sauvegardé dans Firebase:', score);
-            }
+            await db.collection('preinscription_public').doc(user.username).update({
+                bestFlappyBirdScore: score,
+                lastGamePlayed: new Date().toISOString()
+            });
+            console.log('Score sauvegardé dans Firebase:', score);
         } catch (error) {
             console.error('Erreur lors de la sauvegarde du score:', error);
         }
@@ -1573,14 +1609,12 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadBestScoreFromFirebase() {
         try {
             const user = getUserFromCache();
-            if (!user || !user.email) return;
+            if (!user || !user.username) return;
             
-            const userDoc = await db.collection('preinscription')
-                .where('email', '==', user.email)
-                .get();
+            const userDoc = await db.collection('preinscription_public').doc(user.username).get();
             
-            if (!userDoc.empty) {
-                const userData = userDoc.docs[0].data();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
                 const firebaseScore = userData.bestFlappyBirdScore || 0;
                 
                 // Toujours mettre à jour avec le score Firebase de l'utilisateur actuel
@@ -1588,7 +1622,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem('dodje_bird_best_score', gameState.bestScore);
                 updateScoreDisplay();
                 
-                console.log('Score Firebase chargé pour', user.email, ':', firebaseScore);
+                console.log('Score Firebase chargé pour', user.username, ':', firebaseScore);
             }
         } catch (error) {
             console.error('Erreur lors du chargement du score:', error);
@@ -1629,21 +1663,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== LEADERBOARD FUNCTIONS ====================
     async function loadLeaderboard() {
         try {
-            const scoresQuery = await db.collection('preinscription')
+            const snapshot = await db.collection('preinscription_public')
                 .where('bestFlappyBirdScore', '>', 0)
                 .orderBy('bestFlappyBirdScore', 'desc')
-                .get(); // Récupérer tous les scores sans limite
-            
+                .limit(50)
+                .get();
+
             const scores = [];
-            scoresQuery.forEach(doc => {
+            snapshot.forEach(doc => {
                 const data = doc.data();
                 scores.push({
                     username: data.username,
-                    score: data.bestFlappyBirdScore,
-                    email: data.email
+                    score: data.bestFlappyBirdScore
                 });
             });
-            
+
             return scores;
         } catch (error) {
             console.error('Erreur lors du chargement du leaderboard:', error);
@@ -1654,23 +1688,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== REFERRALS LEADERBOARD FUNCTIONS ====================
     async function loadReferralsLeaderboard() {
         try {
-            const referralsQuery = await db.collection('preinscription')
+            const snapshot = await db.collection('preinscription_public')
                 .where('referralsCount', '>', 0)
                 .orderBy('referralsCount', 'desc')
-                .limit(50) // Limiter à 50 pour les performances
+                .limit(50)
                 .get();
-            
-            const referrals = [];
-            referralsQuery.forEach(doc => {
+
+            const scores = [];
+            snapshot.forEach(doc => {
                 const data = doc.data();
-                referrals.push({
+                scores.push({
                     username: data.username,
-                    referralsCount: data.referralsCount,
-                    email: data.email
+                    referralsCount: data.referralsCount
                 });
             });
-            
-            return referrals;
+
+            return scores;
         } catch (error) {
             console.error('Erreur lors du chargement du leaderboard des parrainages:', error);
             return [];
@@ -1748,7 +1781,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const item = document.createElement('div');
                 item.className = 'leaderboard-item';
                 
-                if (currentUser && score.email === currentUser.email) {
+                if (currentUser && score.username === currentUser.username) {
                     item.classList.add('current-user');
                 }
                 
@@ -1977,12 +2010,10 @@ async function updateShareData() {
         console.log('🔄 Mise à jour des données de partage...', user);
         
         // Récupérer les données actualisées depuis Firestore
-        const userDoc = await db.collection('preinscription')
-            .where('email', '==', user.email)
-            .get();
+        const userDoc = await db.collection('preinscription_public').doc(user.username).get();
 
-        if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
             console.log('📋 Données Firestore récupérées complètes:', userData);
             console.log('🔍 Clés disponibles dans userData:', Object.keys(userData));
             
@@ -2089,12 +2120,10 @@ async function updateShareDataFromSameSource() {
         console.log('🔄 Mise à jour données partage avec même source que popup info...', user.email);
         
         // Utiliser exactement la même requête que updateUserInfoForPopup
-        const userDoc = await db.collection('preinscription')
-            .where('email', '==', user.email)
-            .get();
+        const userDoc = await db.collection('preinscription_public').doc(user.username).get();
 
-        if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
             console.log('📋 Données Firestore pour partage (même source):', userData);
             
             // Utiliser exactement les mêmes champs que updateUserInfoForPopup
@@ -2664,12 +2693,10 @@ window.debugUserData = async function() {
     console.log('👤 Utilisateur en cache:', user);
     
     try {
-        const userDoc = await db.collection('preinscription')
-            .where('email', '==', user.email)
-            .get();
+        const userDoc = await db.collection('preinscription_public').doc(user.username).get();
 
-        if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
             console.log('📋 Données Firestore complètes:', userData);
             console.log('🔍 Toutes les clés disponibles:', Object.keys(userData));
             console.log('📊 referralsCount:', userData.referralsCount);

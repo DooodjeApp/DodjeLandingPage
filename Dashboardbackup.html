@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodje - Mon Dashboard</title>
+    
+    <!-- Favicon pour l'onglet du navigateur -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/IconeApp.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/IconeApp.png">
+    <link rel="apple-touch-icon" href="assets/IconeApp.png">
+    
+    <!-- Meta tags pour le SEO et les réseaux sociaux -->
+    <meta name="description" content="Dodje - Mon Dashboard - L'application qui t'apprends la finance simplement et avec fun.">
+    <meta name="keywords" content="finance, éducation financière, application mobile, apprentissage, fun, investissement, dashboard">
+    <meta name="author" content="Dodje">
+    
+    <!-- Open Graph pour Facebook, LinkedIn, etc. -->
+    <meta property="og:title" content="Dodje - Mon Dashboard">
+    <meta property="og:description" content="Découvre la finance de manière ludique et interactive avec Dodje.">
+    <meta property="og:image" content="assets/IconeApp.png">
+    <meta property="og:url" content="https://dodje.xyz/dashboard">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Dodje">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Dodje - Mon Dashboard">
+    <meta name="twitter:description" content="Découvre la finance de manière ludique et interactive avec Dodje.">
+    <meta name="twitter:image" content="assets/IconeApp.png">
+    
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="dashboard-body">
+    <!-- Vidéo d'arrière-plan -->
+    <video id="background-video" 
+           autoplay 
+           muted 
+           loop 
+           playsinline
+           webkit-playsinline
+           x-webkit-airplay="deny"
+           disablepictureinpicture
+           controlslist="nodownload nofullscreen noremoteplayback"
+           preload="metadata"
+           poster="">
+        <source src="assets/anime/FondAnime.mp4" type="video/mp4">
+        Votre navigateur ne supporte pas la vidéo HTML5.
+    </video>
+
+    <!-- Navigation minimale en haut de page -->
+    <nav class="navbar-minimal" id="navbar-minimal">
+        <div class="nav-minimal-container">
+            <div class="nav-logo-centered">
+                <img src="assets/Logo_degrade_PNG.png" alt="Dodje" class="logo-img">
+            </div>
+        </div>
+    </nav>
+
+    <!-- Navigation complète lors du scroll -->
+    <nav class="navbar navbar-scroll" id="navbar-scroll">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <img src="assets/Logo_degrade_PNG.png" alt="Dodje" class="logo-img">
+            </div>
+            <div class="nav-menu">
+                <button class="info-button" onclick="toggleInfoPopup()">
+                    <i class="fas fa-user"></i>
+                </button>
+                <button class="cta-button" onclick="logout()">Quitter</button>
+            </div>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Menu Mobile -->
+    <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
+    <div class="mobile-menu" id="mobile-menu">
+        <div class="mobile-menu-header">
+            <img src="assets/Logo_degrade_PNG.png" alt="Dodje" class="logo-img">
+            <button class="mobile-menu-close" id="mobile-menu-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Informations utilisateur dans le menu mobile -->
+        <div class="mobile-user-info">
+            <div class="mobile-user-header">
+                <i class="fas fa-user"></i>
+                <h3>Mes Informations</h3>
+            </div>
+            <div class="mobile-info-items">
+                <div class="mobile-info-item">
+                    <strong>Email :</strong> <span id="mobile-user-email">--</span>
+                </div>
+                <div class="mobile-info-item">
+                    <strong>Nom d'utilisateur :</strong> <span id="mobile-user-username">--</span>
+                </div>
+                <div class="mobile-info-item">
+                    <strong>Code fondateur :</strong> <span id="mobile-user-founder-code">--</span>
+                </div>
+                <div class="mobile-info-item">
+                    <strong>Inscription :</strong> <span id="mobile-user-registration-date">--</span>
+                </div>
+                <div class="mobile-info-item">
+                    <strong>Mes parrainages :</strong> <span id="mobile-user-referrals-info">--</span>
+                </div>
+                <div class="mobile-info-item">
+                    <strong>Flappy Dodje :</strong> <span id="mobile-user-flappy-info">--</span>
+                </div>
+            </div>
+            
+            <!-- Section de partage mobile -->
+            <div class="mobile-share-section">
+                <button class="mobile-share-button" onclick="toggleShareCard()">
+                    <i class="fas fa-share-alt"></i>
+                    Partager mes stats
+                </button>
+            </div>
+        </div>
+        
+        <div class="mobile-cta">
+            <button class="cta-button" onclick="logout()">Quitter</button>
+        </div>
+    </div>
+
+    <!-- Info Popup -->
+    <div class="info-popup" id="infoPopup">
+        <div class="info-popup-content">
+            <div class="info-popup-header">
+                <h3>Mes Informations</h3>
+                <button class="close-popup" onclick="toggleInfoPopup()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="info-popup-body">
+                <div class="info-item">
+                    <strong>Email :</strong> <span id="user-email">--</span>
+                </div>
+                <div class="info-item">
+                    <strong>Nom d'utilisateur :</strong> <span id="user-username">--</span>
+                </div>
+                <div class="info-item">
+                    <strong>Code fondateur :</strong> <span id="user-founder-code-popup">--</span>
+                </div>
+                <div class="info-item">
+                    <strong>Inscription :</strong> <span id="user-registration-date">--</span>
+                </div>
+                <div class="info-item">
+                    <strong>Mes parrainages :</strong> <span id="user-referrals-info">--</span>
+                </div>
+                <div class="info-item">
+                    <strong>Flappy Dodje :</strong> <span id="user-flappy-info">--</span>
+                </div>
+                
+                <!-- Section de partage -->
+                <div class="share-section">
+                    <button class="share-button" onclick="toggleShareCard()">
+                        <i class="fas fa-share-alt"></i>
+                        Partager mes stats
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Popup -->
+    <div class="share-popup" id="sharePopup" style="display: none;">
+        <div class="share-popup-content">
+            <div class="share-popup-header">
+                <h3>Partager mes <span class="animate-gratuit">stats</span></h3>
+                <button class="close-share-popup" onclick="toggleShareCard()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="share-popup-body">
+                <!-- Card stylisé pour le partage -->
+                <div class="share-card" id="shareCard">
+                    <div class="share-card-background">
+                        <div class="share-card-content">
+                            <div class="share-card-header">
+                                <h3><span class="animate-simplement" id="share-username">--</span></h3>
+                            </div>
+                            
+                            <div class="share-stats-connected">
+                                <div class="stats-row">
+                                    <div class="stat-box">
+                                        <span class="stat-value" id="share-referrals">--</span>
+                                        <span class="stat-label">Parrainages</span>
+                                    </div>
+                                    
+                                    <div class="stat-box">
+                                        <span class="stat-value" id="share-flappy-score">--</span>
+                                        <span class="stat-label">Flappy Dodje</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="founder-code-box">
+                                    <span class="stat-label">Code fondateur :</span>
+                                    <span class="stat-value code-value" id="share-founder-code">--</span>
+                                </div>
+                            </div>
+                            
+                            <div class="share-card-footer">
+                                <p>Rejoins-moi sur <img src="assets/Logo_degrade_PNG.png" alt="Dodje" class="dodje-logo-inline"> !</p>
+                                <span class="share-link">dodje.xyz</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Boutons de partage -->
+                <div class="share-buttons">
+                    <button class="share-btn twitter" onclick="shareAsImage('twitter')">
+                        <i class="fas fa-x"></i>
+                        X
+                    </button>
+                    <button class="share-btn instagram" onclick="shareAsImage('instagram')">
+                        <i class="fab fa-instagram"></i>
+                        Instagram
+                    </button>
+                    <button class="share-btn discord" onclick="shareAsImage('discord')">
+                        <i class="fab fa-discord"></i>
+                        Discord
+                    </button>
+                    <button class="share-btn download" onclick="downloadShareCard()">
+                        <i class="fas fa-download"></i>
+                        Télécharger
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <main class="dashboard-main">
+        <div class="container">
+            <div class="dashboard-header">
+                <div class="header-content">
+                    <h1>Bienvenue dans l'aventure Dodje<br><span class="animate-jeune-gland">jeune gland</span> !</h1>
+                    <div class="header-countdown">
+                        <div class="countdown-timer-inline">
+                            <div class="time-unit-inline">
+                                <span id="days-mini" class="time-value-inline">--</span>
+                                <span class="time-label-inline">JOURS</span>
+                            </div>
+                            <div class="time-unit-inline">
+                                <span id="hours-mini" class="time-value-inline">--</span>
+                                <span class="time-label-inline">HEURES</span>
+                            </div>
+                            <div class="time-unit-inline">
+                                <span id="minutes-mini" class="time-value-inline">--</span>
+                                <span class="time-label-inline">MIN</span>
+                            </div>
+                            <div class="time-unit-inline">
+                                <span id="seconds-mini" class="time-value-inline">--</span>
+                                <span class="time-label-inline">SEC</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="dashboard-subtitle">Relève des défis, réalise les meilleurs scores et gagne des récompenses exclusives avant la sortie de l'application !</p>
+                </div>
+            </div>
+
+            <!-- Passe de Combat -->
+            <div class="battle-pass-section">
+                <div class="battle-pass-row">
+                    <div class="battle-pass-content">
+                        <h2 class="battle-pass-title">
+                            <span class="animate-reveil-gland">L'éveil du gland</span>
+                        </h2>
+                        <p class="battle-pass-description">
+                            Invite tes amis et débloque des récompenses ! Plus tu parraines, plus tu gagnes !
+                        </p>
+                        <div class="battle-pass-quote">
+                            <strong>Tu pourras récuperer tes récompenses dans l'application lorsqu'elle sera disponible !</strong>
+                        </div>
+                    </div>
+
+                    <div class="battle-pass-right-column">
+                        <!-- Compteur de préinscriptions -->
+                        <div class="preregistration-counter-compact">
+                            <div class="counter-row" onclick="toggleReferralsLeaderboard()" title="Voir le classement des parrainages">
+                                <div class="counter-info">
+                                    <span class="counter-number" id="preregistration-count">--</span>
+                                    <span class="counter-label">glands préinscrits</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="founder-code-visual">
+                            <div class="founder-code-section">
+                                <h3 class="founder-code-title">Mon code fondateur</h3>
+                                <div class="founder-code">
+                                    <div class="code-value" id="user-founder-code">
+                                        <!-- Code sera injecté par JavaScript -->
+                                    </div>
+                                    <button class="copy-button-minimal" onclick="copyFounderCode()" title="Copier le code">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <p class="founder-code-description">Partage ton code avec tes amis pour qu'ils rejoignent l'aventure</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="battle-pass-rewards">
+                    <div class="advancement-score">
+                        <span id="referrals-count">0</span> parrainages réalisés
+                    </div>
+                    <div class="rewards-track">
+                        <!-- Niveau 1 -->
+                        <div class="reward-item" data-level="1">
+                            <div class="reward-icon">
+                                <i class="fas fa-crown"></i>
+                            </div>
+                            <div class="reward-info">
+                                <div class="reward-title">Dodje Fondateur</div>
+                                <div class="reward-description">Icône exclusive</div>
+                            </div>
+                            <div class="reward-requirement">1 parrainage</div>
+                        </div>
+                        
+                        <!-- Niveau 5 -->
+                        <div class="reward-item" data-level="5">
+                            <div class="reward-icon">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="reward-info">
+                                <div class="reward-title">DodjeOne Gratuit</div>
+                                <div class="reward-description">1 mois offert à l'inscription</div>
+                            </div>
+                            <div class="reward-requirement">5 parrainages</div>
+                        </div>
+                        
+                        <!-- Niveau 10 -->
+                        <div class="reward-item" data-level="10">
+                            <div class="reward-icon">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="reward-info">
+                                <div class="reward-title">1500 Dodji</div>
+                                <div class="reward-description">Monnaie virtuelle offerte</div>
+                            </div>
+                            <div class="reward-requirement">10 parrainages</div>
+                        </div>
+                        
+                        <!-- Niveau 25 -->
+                        <div class="reward-item" data-level="25">
+                            <div class="reward-icon">
+                                <i class="fas fa-rocket"></i>
+                            </div>
+                            <div class="reward-info">
+                                <div class="reward-title">Entrée exclusive</div>
+                                <div class="reward-description">Accès au discord privé</div>
+                            </div>
+                            <div class="reward-requirement">25 parrainages</div>
+                        </div>
+                        
+                        <!-- Niveau 50 -->
+                        <div class="reward-item" data-level="50">
+                            <div class="reward-icon">
+                                <i class="fas fa-mask"></i>
+                            </div>
+                            <div class="reward-info">
+                                <div class="reward-title">Skin "Gland Fondateur"</div>
+                                <div class="reward-description">Skin exclusif</div>
+                            </div>
+                            <div class="reward-requirement">50 parrainages</div>
+                        </div>
+                        
+                        <!-- Niveau 100 -->
+                        <div class="reward-item" data-level="100">
+                            <div class="reward-icon">
+                                <i class="fas fa-infinity"></i>
+                            </div>
+                            <div class="reward-info">
+                                <div class="reward-title">DodjeOne à Vie</div>
+                                <div class="reward-description">Abonnement premium permanent</div>
+                            </div>
+                            <div class="reward-requirement">100 parrainages</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Minijeu Flappy Bird -->
+            <div class="game-section">
+                <div class="game-header">
+                    <div class="game-title">
+                        <div class="game-title-row">
+                            <h2><span class="animate-entourage">Flappy Dodje</span></h2>
+                        </div>
+                        <p class="game-description">
+                            Les premiers gagneront des récompenses incroyables, alors à toi de jouer !
+                        </p>
+                    </div>
+                    <div class="game-score">
+                        <div class="score-display">
+                            <span id="current-score">0</span>
+                            <span class="score-label">Score</span>
+                        </div>
+                        <div class="best-score">
+                            <span id="best-score">0</span>
+                            <span class="score-label">Meilleur</span>
+                        </div>
+                        <button class="leaderboard-button-header" onclick="toggleLeaderboard()">
+                            <img src="assets/Trophee.png" alt="Trophée" class="trophy-icon"> Classement
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="game-container">
+                    <canvas id="gameCanvas" width="800" height="500"></canvas>
+                    <div class="game-overlay" id="gameOverlay">
+                        <div class="game-start-screen" id="startScreen">
+                            <p>Clique ou appuie sur ESPACE pour jouer</p>
+                            <button class="start-button" onclick="startGame()">Commencer</button>
+                        </div>
+                        <div class="game-over-screen" id="gameOverScreen" style="display: none;">
+                            <h3>Game Over!</h3>
+                            <p>Score: <span id="finalScore">0</span></p>
+                            <p>Meilleur score: <span id="finalBestScore">0</span></p>
+                            <button class="restart-button" onclick="restartGame()">Rejouer</button>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Popup du Leaderboard Global -->
+    <div class="leaderboard-popup" id="leaderboardPopup" style="display: none;">
+        <div class="leaderboard-popup-content">
+            <div class="leaderboard-header">
+                <h3><img src="assets/Trophee.png" alt="Trophée" class="trophy-icon-header"> Classement Global</h3>
+                <div class="leaderboard-actions">
+                    <button class="share-leaderboard-button" onclick="toggleShareCard()" title="Partager mes stats">
+                        <i class="fas fa-share-alt"></i>
+                    </button>
+                    <button class="close-leaderboard" onclick="closeLeaderboard()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="leaderboard-content">
+                <div class="leaderboard-loading" id="leaderboardLoading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Chargement du classement...</p>
+                </div>
+                <div class="leaderboard-list" id="leaderboardList">
+                    <!-- Les scores seront injectés ici -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup du Leaderboard des Parrainages -->
+    <div class="leaderboard-popup" id="referralsLeaderboardPopup" style="display: none;">
+        <div class="leaderboard-popup-content">
+            <div class="leaderboard-header">
+                <h3><img src="assets/Trophee.png" alt="Trophée" class="trophy-icon-header"> Classement des Parrainages</h3>
+                <div class="leaderboard-actions">
+                    <button class="share-leaderboard-button" onclick="toggleShareCard()" title="Partager mes stats">
+                        <i class="fas fa-share-alt"></i>
+                    </button>
+                    <button class="close-leaderboard" onclick="closeReferralsLeaderboard()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="leaderboard-content">
+                <div class="leaderboard-loading" id="referralsLeaderboardLoading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Chargement du classement...</p>
+                </div>
+                <div class="leaderboard-list" id="referralsLeaderboardList">
+                    <!-- Les scores de parrainages seront injectés ici -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <img src="assets/Logo_degrade_PNG.png" alt="Dodje" class="footer-logo">
+                    <p>L'application qui révolutionne l'éducation financière</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Suis le mouvement</h4>
+                                    <div class="social-links">
+                    <a href="https://www.tiktok.com/@user453081960316645" class="social-link" target="_blank"><i class="fab fa-tiktok"></i></a>
+                    <a href="https://www.instagram.com/dodjeapp/" class="social-link" target="_blank"><i class="fab fa-instagram"></i></a>
+                    <a href="https://discord.gg/g3VH3Qtx8p" class="social-link" target="_blank"><i class="fab fa-discord"></i></a>
+                    <a href="https://x.com/DodjeApp" class="social-link" target="_blank"><i class="fas fa-x"></i></a>
+                </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Liens utiles</h4>
+                    <ul>
+                        <li><a href="conditions-utilisation.html">Conditions d'utilisation</a></li>
+                        <li><a href="politique-confidentialite.html">Confidentialité</a></li>
+                        <li><a href="mailto:contact@dodje.xyz">contact@dodje.xyz</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Dodje. Tous droits réservés.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <script src="dashboard.js"></script>
+</body>
+</html> 

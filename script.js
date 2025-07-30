@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour vérifier si un code fondateur existe déjà
     async function checkFounderCodeExists(founderCode) {
         try {
-            const preinscriptionQuery = await db.collection('preinscription')
+            const preinscriptionQuery = await db.collection('preinscription_public')
                 .where('generatedFounderCode', '==', founderCode)
                 .get();
             
@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function incrementFounderCodeUsage(founderCode) {
         try {
             // Trouver la personne qui possède ce code fondateur
-            const ownerQuery = await db.collection('preinscription')
+            const ownerQuery = await db.collection('preinscription_public')
                 .where('generatedFounderCode', '==', founderCode)
                 .get();
             
@@ -304,23 +304,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
             
-            // Incrémenter le compteur pour chaque propriétaire (normalement un seul)
-            const batch = db.batch();
+            const ownerDoc = ownerQuery.docs[0];
+            const currentData = ownerDoc.data();
+            const username = currentData.username;
             
-            ownerQuery.forEach(doc => {
-                const docRef = db.collection('preinscription').doc(doc.id);
-                const currentData = doc.data();
-                const currentCount = currentData.referralsCount || 0;
-                
-                batch.update(docRef, {
-                    referralsCount: currentCount + 1,
-                    lastReferralDate: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                console.log(`Incrémentation du compteur pour ${currentData.username}: ${currentCount} -> ${currentCount + 1}`);
+            const currentCount = currentData.referralsCount || 0;
+            const newCount = currentCount + 1;
+            
+            // Mettre à jour uniquement dans preinscription_public
+            const publicDocRef = db.collection('preinscription_public').doc(username);
+            await publicDocRef.update({
+                referralsCount: newCount,
+                lastReferralDate: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            await batch.commit();
+            console.log(`Incrémentation du compteur pour ${username}: ${currentCount} -> ${newCount}`);
+            
             return true;
         } catch (error) {
             console.error('Erreur lors de l\'incrémentation du compteur:', error);
@@ -369,47 +368,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour vérifier la sécurité IP du code de parrainage
     async function checkReferralIPSecurity(founderCode, currentIP) {
         try {
-            if (!currentIP) {
-                console.warn('IP non disponible, vérification IP désactivée');
-                return { valid: true }; // Si on ne peut pas récupérer l'IP, on autorise
-            }
-            
-            // Trouver le créateur du code fondateur
-            const founderQuery = await db.collection('preinscription')
-                .where('generatedFounderCode', '==', founderCode)
-                .get();
-            
-            if (founderQuery.empty) {
-                return { valid: false, reason: 'Code fondateur inexistant' };
-            }
-            
-            const founderData = founderQuery.docs[0].data();
-            const creatorIP = founderData.registrationIP;
-            
-            if (creatorIP && creatorIP === currentIP) {
-                console.warn('Tentative de fraude détectée:', {
-                    founderCode: founderCode,
-                    currentIP: currentIP,
-                    creatorIP: creatorIP,
-                    timestamp: new Date().toISOString()
-                });
-                
-                // Enregistrer la tentative de fraude dans Firebase
-                await logFraudAttempt(founderCode, currentIP, creatorIP, {
-                    founderUsername: founderData.username,
-                    founderEmail: founderData.email
-                });
-                
-                return { 
-                    valid: false, 
-                    reason: 'Vous ne pouvez pas utiliser votre propre code de parrainage' 
-                };
-            }
-            
+            // Vérification IP désactivée car preinscription_public ne contient pas les IPs
             return { valid: true };
         } catch (error) {
             console.error('Erreur lors de la vérification IP:', error);
-            return { valid: true }; // En cas d'erreur, on autorise pour ne pas bloquer l'utilisateur
+            return { valid: true };
         }
     }
     
@@ -442,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Vérifier si le code fondateur utilisé existe (si fourni)
             if (founderCode) {
-                const founderQuery = await db.collection('preinscription')
+                const founderQuery = await db.collection('preinscription_public')
                     .where('generatedFounderCode', '==', founderCode)
                     .get();
                 
@@ -468,15 +431,33 @@ document.addEventListener('DOMContentLoaded', function() {
             // Générer le code fondateur automatiquement (unique)
             const generatedFounderCode = await generateUniqueFounderCode(username);
             
+            // ==================== CRÉATION DANS LES DEUX COLLECTIONS ====================
+            
+            // 1. Créer dans la collection PRIVÉE (avec email et IP)
             const docRef = await db.collection('preinscription').add({
                 email: email,
                 username: username,
-                founderCodeUsed: founderCode || null, // Code fondateur utilisé (optionnel)
-                generatedFounderCode: generatedFounderCode, // Code fondateur généré automatiquement
-                referralsCount: 0, // Compteur d'utilisations de son code
-                registrationIP: currentIP, // Adresse IP d'inscription
+                founderCodeUsed: founderCode || null,
+                generatedFounderCode: generatedFounderCode,
+                referralsCount: 0,
+                registrationIP: currentIP, // ✅ SENSIBLE - seulement dans preinscription
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending'
+                status: 'pending',
+                bestFlappyBirdScore: 0,
+                lastGamePlayed: null
+            });
+            
+            // 2. Créer dans la collection PUBLIQUE (sans email et IP)
+            await db.collection('preinscription_public').doc(username).set({
+                username: username,
+                founderCodeUsed: founderCode || null,
+                generatedFounderCode: generatedFounderCode,
+                referralsCount: 0,
+                // ✅ email et registrationIP EXCLUS
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'pending',
+                bestFlappyBirdScore: 0,
+                lastGamePlayed: null
             });
             
             // Si un code fondateur a été utilisé, incrémenter le compteur du propriétaire
