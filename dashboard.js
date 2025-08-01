@@ -225,6 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialiser Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const functions = firebase.functions();
     
     // ==================== CHARGEMENT IMMÉDIAT DU COMPTEUR ====================
     // Charger le compteur dès que Firebase est prêt (avant toute autre logique)

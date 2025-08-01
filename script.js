@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialiser Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const functions = firebase.functions();
     
     // Fonction pour générer un code fondateur
     function generateFounderCode(username) {
@@ -235,59 +236,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${username}${timestamp}`;
     }
     
-    // Fonction pour vérifier les doublons d'email
+    // Fonction pour vérifier les doublons d'email (VERSION SÉCURISÉE)
     async function checkEmailExists(email) {
         try {
-            // Vérifier dans la collection "preinscription"
-            const preinscriptionQuery = await db.collection('preinscription')
-                .where('email', '==', email)
-                .get();
+            // ✅ Appel sécurisé via Cloud Function
+            const checkEmailFunction = functions.httpsCallable('checkEmailExists');
+            const result = await checkEmailFunction({ email: email });
             
-            if (!preinscriptionQuery.empty) {
-                return { exists: true, collection: 'preinscription' };
-            }
-            
-            // Vérifier dans la collection "users"
-            const usersQuery = await db.collection('users')
-                .where('email', '==', email)
-                .get();
-            
-            if (!usersQuery.empty) {
-                return { exists: true, collection: 'users' };
-            }
-            
-            return { exists: false };
+            return result.data;
         } catch (error) {
             console.error('Erreur lors de la vérification de l\'email:', error);
             throw error;
         }
     }
     
-    // Fonction pour vérifier les doublons de nom d'utilisateur
+    // Fonction pour vérifier les doublons de nom d'utilisateur (VERSION SÉCURISÉE)
     async function checkUsernameExists(username) {
         try {
-            // Vérifier dans la collection "preinscription"
-            const preinscriptionQuery = await db.collection('preinscription')
-                .where('username', '==', username)
-                .get();
+            // ✅ Appel sécurisé via Cloud Function
+            const checkUsernameFunction = functions.httpsCallable('checkUsernameExists');
+            const result = await checkUsernameFunction({ username: username });
             
-            if (!preinscriptionQuery.empty) {
-                return { exists: true, collection: 'preinscription' };
-            }
-            
-            // Vérifier dans la collection "users"
-            const usersQuery = await db.collection('users')
-                .where('name', '==', username)
-                .get();
-            
-            if (!usersQuery.empty) {
-                return { exists: true, collection: 'users' };
-            }
-            
-            return { exists: false };
+            return result.data;
         } catch (error) {
             console.error('Erreur lors de la vérification du nom d\'utilisateur:', error);
-            throw error;
+            return { exists: false };
         }
     }
 
@@ -376,14 +349,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Fonction pour enregistrer une préinscription
+    // Fonction pour enregistrer une préinscription (VERSION SÉCURISÉE)
     async function savePreinscription(email, username, founderCode) {
         try {
             // Récupérer l'IP actuelle
             const currentIP = await getCurrentIP();
             console.log('IP actuelle:', currentIP);
             
-            // Vérifier les doublons d'email
+            // Vérifications côté client (pour UX rapide)
             const emailCheck = await checkEmailExists(email);
             if (emailCheck.exists) {
                 return { 
@@ -393,7 +366,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             }
             
-            // Vérifier les doublons de nom d'utilisateur
             const usernameCheck = await checkUsernameExists(username);
             if (usernameCheck.exists) {
                 return { 
@@ -428,51 +400,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // Générer le code fondateur automatiquement (unique)
-            const generatedFounderCode = await generateUniqueFounderCode(username);
-            
-            // ==================== CRÉATION DANS LES DEUX COLLECTIONS ====================
-            
-            // 1. Créer dans la collection PRIVÉE (avec email et IP)
-            const docRef = await db.collection('preinscription').add({
+            // ✅ Appel sécurisé via Cloud Function
+            const registerFunction = functions.httpsCallable('registerUser');
+            const result = await registerFunction({ 
                 email: email,
                 username: username,
-                founderCodeUsed: founderCode || null,
-                generatedFounderCode: generatedFounderCode,
-                referralsCount: 0,
-                registrationIP: currentIP, // ✅ SENSIBLE - seulement dans preinscription
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending',
-                bestFlappyBirdScore: 0,
-                lastGamePlayed: null
-            });
-            
-            // 2. Créer dans la collection PUBLIQUE (sans email et IP)
-            await db.collection('preinscription_public').doc(username).set({
-                username: username,
-                founderCodeUsed: founderCode || null,
-                generatedFounderCode: generatedFounderCode,
-                referralsCount: 0,
-                // ✅ email et registrationIP EXCLUS
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending',
-                bestFlappyBirdScore: 0,
-                lastGamePlayed: null
+                founderCode: founderCode,
+                registrationIP: currentIP
             });
             
             // Si un code fondateur a été utilisé, incrémenter le compteur du propriétaire
-            if (founderCode) {
+            if (founderCode && result.data.success) {
                 console.log('Code fondateur utilisé:', founderCode);
                 await incrementFounderCodeUsage(founderCode);
             }
             
-            console.log('Préinscription enregistrée avec l\'ID:', docRef.id);
-            console.log('Code fondateur généré:', generatedFounderCode);
-            console.log('IP enregistrée:', currentIP);
-            return { success: true, id: docRef.id, founderCode: generatedFounderCode };
+            console.log('✅ Préinscription réussie:', result.data);
+            return { 
+                success: result.data.success, 
+                id: result.data.user?.documentId,
+                founderCode: result.data.user?.generatedFounderCode
+            };
+            
         } catch (error) {
             console.error('Erreur lors de l\'enregistrement:', error);
-            return { success: false, error: error.message };
+            
+            // Gestion des erreurs Firebase Functions
+            if (error.code === 'functions/already-exists') {
+                return { success: false, error: 'duplicate', message: error.message };
+            } else if (error.code === 'functions/invalid-argument') {
+                return { success: false, error: 'validation', message: error.message };
+            }
+            
+            return { success: false, error: error.message || 'Erreur d\'inscription' };
         }
     }
     // ==================== MODAL MANAGEMENT ====================
@@ -576,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('login-form');
     const loginInput = document.getElementById('login-input');
     
-    // Fonction pour vérifier les credentials de connexion
+    // Fonction pour vérifier les credentials de connexion (VERSION SÉCURISÉE)
     async function checkLoginCredentials(email) {
         try {
             // Vérifier que c'est bien un email valide
@@ -584,30 +544,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 return { success: false, error: 'Adresse email invalide' };
             }
             
-            // Recherche par email uniquement
-            const query = await db.collection('preinscription')
-                .where('email', '==', email)
-                .get();
+            // ✅ Appel sécurisé via Cloud Function
+            const loginFunction = functions.httpsCallable('loginUser');
+            const result = await loginFunction({ email: email });
             
-            if (!query.empty) {
-                const userData = query.docs[0].data();
-                return {
-                    success: true,
-                    user: {
-                        email: userData.email,
-                        username: userData.username,
-                        founderCode: userData.generatedFounderCode,
-                        registrationDate: userData.timestamp,
-                        documentId: query.docs[0].id,
-                        isRegistered: true,
-                        lastLogin: new Date().toISOString()
-                    }
-                };
-            } else {
-                return { success: false, error: 'Aucun compte trouvé avec cette adresse email' };
-            }
+            return result.data;
+            
         } catch (error) {
             console.error('Erreur lors de la vérification des credentials:', error);
+            
+            // Gestion des erreurs Firebase Functions
+            if (error.code === 'functions/not-found') {
+                return { success: false, error: 'Aucun compte trouvé avec cette adresse email' };
+            } else if (error.code === 'functions/invalid-argument') {
+                return { success: false, error: 'Adresse email invalide' };
+            }
+            
             return { success: false, error: 'Erreur de connexion' };
         }
     }

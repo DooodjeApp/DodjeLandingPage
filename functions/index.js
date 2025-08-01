@@ -2,6 +2,267 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 admin.initializeApp();
 
+// ==================== FONCTIONS DE VALIDATION SÉCURISÉES ====================
+
+// 1. Vérifier si un email existe déjà
+exports.checkEmailExists = functions.https.onCall(async (data, context) => {
+  try {
+    const { email } = data;
+    
+    if (!email || !email.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Email invalide');
+    }
+    
+    console.log(`🔍 Vérification email: ${email}`);
+    
+    // Vérifier dans preinscription (privé)
+    const preinscriptionQuery = await admin.firestore()
+      .collection('preinscription')
+      .where('email', '==', email)
+      .get();
+    
+    if (!preinscriptionQuery.empty) {
+      return { exists: true, collection: 'preinscription' };
+    }
+    
+    // Vérifier dans users (même si pas encore utilisé)
+    const usersQuery = await admin.firestore()
+      .collection('users')
+      .where('email', '==', email)
+      .get();
+    
+    if (!usersQuery.empty) {
+      return { exists: true, collection: 'users' };
+    }
+    
+    return { exists: false };
+    
+  } catch (error) {
+    console.error('❌ Erreur vérification email:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Erreur de vérification email');
+  }
+});
+
+// 2. Vérifier si un username existe déjà
+exports.checkUsernameExists = functions.https.onCall(async (data, context) => {
+  try {
+    const { username } = data;
+    
+    if (!username || username.length < 2) {
+      throw new functions.https.HttpsError('invalid-argument', 'Username invalide');
+    }
+    
+    console.log(`🔍 Vérification username: ${username}`);
+    
+    // Vérifier dans preinscription (privé)
+    const preinscriptionQuery = await admin.firestore()
+      .collection('preinscription')
+      .where('username', '==', username)
+      .get();
+    
+    if (!preinscriptionQuery.empty) {
+      return { exists: true, collection: 'preinscription' };
+    }
+    
+    // Vérifier dans users
+    const usersQuery = await admin.firestore()
+      .collection('users')
+      .where('username', '==', username)
+      .get();
+    
+    if (!usersQuery.empty) {
+      return { exists: true, collection: 'users' };
+    }
+    
+    return { exists: false };
+    
+  } catch (error) {
+    console.error('❌ Erreur vérification username:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Erreur de vérification username');
+  }
+});
+
+// 3. Inscription sécurisée
+exports.registerUser = functions.https.onCall(async (data, context) => {
+  try {
+    const { email, username, founderCode, registrationIP } = data;
+    
+    // Validations
+    if (!email || !email.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Email invalide');
+    }
+    
+    if (!username || username.length < 2) {
+      throw new functions.https.HttpsError('invalid-argument', 'Username invalide');
+    }
+    
+    console.log(`📝 Inscription: ${username} (${email})`);
+    
+    // Vérifier unicité email et username
+    const [emailCheck, usernameCheck] = await Promise.all([
+      admin.firestore().collection('preinscription').where('email', '==', email).get(),
+      admin.firestore().collection('preinscription').where('username', '==', username).get()
+    ]);
+    
+    if (!emailCheck.empty) {
+      throw new functions.https.HttpsError('already-exists', 'Cet email est déjà utilisé');
+    }
+    
+    if (!usernameCheck.empty) {
+      throw new functions.https.HttpsError('already-exists', 'Ce nom d\'utilisateur est déjà pris');
+    }
+    
+    // Générer le code fondateur unique
+    const generatedFounderCode = await generateUniqueFounderCodeSecure(username);
+    
+    // Préparer les données
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+    
+    const privateData = {
+      email: email,
+      username: username,
+      founderCodeUsed: founderCode || null,
+      generatedFounderCode: generatedFounderCode,
+      referralsCount: 0,
+      registrationIP: registrationIP || null,
+      timestamp: timestamp,
+      status: 'pending',
+      bestFlappyBirdScore: 0,
+      lastGamePlayed: null
+    };
+    
+    const publicData = {
+      username: username,
+      founderCodeUsed: founderCode || null,
+      generatedFounderCode: generatedFounderCode,
+      referralsCount: 0,
+      timestamp: timestamp,
+      status: 'pending',
+      bestFlappyBirdScore: 0,
+      lastGamePlayed: null
+    };
+    
+    // Transaction pour créer dans les deux collections
+    const batch = admin.firestore().batch();
+    
+    // 1. Créer dans preinscription (privé)
+    const privateRef = admin.firestore().collection('preinscription').doc();
+    batch.set(privateRef, privateData);
+    
+    // 2. Créer dans preinscription_public
+    const publicRef = admin.firestore().collection('preinscription_public').doc(username);
+    batch.set(publicRef, publicData);
+    
+    // Exécuter la transaction
+    await batch.commit();
+    
+    console.log(`✅ Inscription réussie: ${username}`);
+    
+    return {
+      success: true,
+      user: {
+        username: username,
+        generatedFounderCode: generatedFounderCode,
+        registrationDate: new Date().toISOString(),
+        documentId: privateRef.id
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Erreur inscription:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Erreur lors de l\'inscription');
+  }
+});
+
+// 4. Connexion sécurisée
+exports.loginUser = functions.https.onCall(async (data, context) => {
+  try {
+    const { email } = data;
+    
+    if (!email || !email.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Email invalide');
+    }
+    
+    console.log(`🔐 Tentative de connexion: ${email}`);
+    
+    // Recherche sécurisée côté serveur
+    const query = await admin.firestore()
+      .collection('preinscription')
+      .where('email', '==', email)
+      .get();
+    
+    if (query.empty) {
+      throw new functions.https.HttpsError('not-found', 'Aucun compte trouvé avec cette adresse email');
+    }
+    
+    const userData = query.docs[0].data();
+    
+    return {
+      success: true,
+      user: {
+        email: userData.email,
+        username: userData.username,
+        founderCode: userData.generatedFounderCode,
+        registrationDate: userData.timestamp,
+        documentId: query.docs[0].id,
+        isRegistered: true,
+        lastLogin: new Date().toISOString()
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Erreur connexion:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Erreur de connexion');
+  }
+});
+
+// ==================== FONCTIONS UTILITAIRES ====================
+
+// Génération sécurisée de code fondateur unique
+async function generateUniqueFounderCodeSecure(username) {
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  while (attempts < maxAttempts) {
+    const founderCode = generateFounderCodeLogic(username);
+    
+    // Vérifier dans preinscription_public (accessible sans règles spéciales)
+    const exists = await admin.firestore()
+      .collection('preinscription_public')
+      .where('generatedFounderCode', '==', founderCode)
+      .get();
+    
+    if (exists.empty) {
+      return founderCode;
+    }
+    
+    attempts++;
+  }
+  
+  // Fallback avec timestamp
+  const timestamp = Date.now().toString().slice(-3);
+  return `${username}${timestamp}`;
+}
+
+// Logique de génération de code fondateur
+function generateFounderCodeLogic(username) {
+  const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `${cleanUsername}${randomSuffix}`;
+}
+
 // ==================== FONCTION DE SYNCHRONISATION AUTOMATIQUE ====================
 // Se déclenche automatiquement à chaque modification dans preinscription_public
 exports.syncToPrivateCollection = functions.firestore
