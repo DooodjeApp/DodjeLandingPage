@@ -785,11 +785,11 @@ body {
 
 .hero-subtitle {
     font-size: var(--font-size-xl);
-    font-weight: 300;
     line-height: var(--line-height-relaxed);
     color: var(--gray-300);
-    margin-bottom: var(--space-10);
+    margin: 0 auto var(--space-10);
     max-width: 540px;
+    text-align: center;
 }
 
 .hero-cta {
@@ -1556,6 +1556,15 @@ body {
     text-align: center;
 }
 
+.community-description {
+    font-size: var(--font-size-xl);
+    color: var(--gray-300);
+    line-height: var(--line-height-relaxed);
+    margin: 0;
+    text-align: center;
+    max-width: 540px;
+}
+
 .community-cta {
     font-size: var(--font-size-lg);
     padding: var(--space-4) var(--space-8);
@@ -1609,19 +1618,21 @@ body {
 .social-link {
     width: 44px;
     height: 44px;
-    background: var(--secondary-green);
+    background: linear-gradient(135deg, #9BEC00, #06D001);
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--black);
+    color: var(--white);
     text-decoration: none;
     transition: var(--transition-all);
+    box-shadow: 0 4px 15px rgba(155, 236, 0, 0.3);
 }
 
 .social-link:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(155, 236, 0, 0.4), 0 0 0 3px rgba(155, 236, 0, 0.2);
+    background: linear-gradient(135deg, #B8FF20, #08E003);
 }
 
 .footer-section ul {
