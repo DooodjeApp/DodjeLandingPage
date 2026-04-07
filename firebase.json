@@ -16,6 +16,10 @@
     ],
     "rewrites": [
       {
+        "source": "/conditions-utilisation/tiktokrNfNhvCRu1oRWgJXbKHy2rGZzQsR0WFx.txt",
+        "destination": "/tiktokrNfNhvCRu1oRWgJXbKHy2rGZzQsR0WFx.txt"
+      },
+      {
         "source": "/conditions-utilisation.html/tiktokrNfNhvCRu1oRWgJXbKHy2rGZzQsR0WFx.txt",
         "destination": "/tiktokrNfNhvCRu1oRWgJXbKHy2rGZzQsR0WFx.txt"
       },
