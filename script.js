@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fonction pour gérer l'affichage des headers selon le scroll
     function handleScrollNavigation() {
+        if (!navbarMinimal || !navbarScroll) return;
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         
         if (scrollTop > scrollThreshold) {
@@ -63,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fonction pour ouvrir le menu mobile
     function openMobileMenu() {
+        if (!mobileMenu || !mobileMenuOverlay) return;
         mobileMenu.classList.add('active');
         mobileMenuOverlay.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -70,6 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fonction pour fermer le menu mobile
     function closeMobileMenu() {
+        if (!mobileMenu || !mobileMenuOverlay) return;
         mobileMenu.classList.remove('active');
         mobileMenuOverlay.classList.remove('active');
         document.body.style.overflow = 'auto';
@@ -96,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fermer le menu mobile sur escape
     document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape' && mobileMenu.classList.contains('active')) {
+        if (event.key === 'Escape' && mobileMenu && mobileMenu.classList.contains('active')) {
             closeMobileMenu();
         }
     });
@@ -151,17 +154,19 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastScrollTop = 0;
     const navbar = document.querySelector('.navbar');
     
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        
-        if (scrollTop > 100) {
-            navbar.classList.add('scrolled');
-        } else {
-            navbar.classList.remove('scrolled');
-        }
-        
-        lastScrollTop = scrollTop;
-    }, { passive: true });
+    if (navbar) {
+        window.addEventListener('scroll', function() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            if (scrollTop > 100) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+            
+            lastScrollTop = scrollTop;
+        }, { passive: true });
+    }
 
     // Phone mockup tilt effect
     const phoneMockup = document.querySelector('.phone-mockup');

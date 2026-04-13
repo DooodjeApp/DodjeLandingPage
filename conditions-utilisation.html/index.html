@@ -34,31 +34,73 @@
 </head>
 <body>
     <!-- Vidéo d'arrière-plan -->
-    <video id="background-video" autoplay muted loop playsinline>
+    <video id="background-video" autoplay muted loop playsinline loading="lazy" preload="metadata">
         <source src="../assets/anime/FondAnime.mp4" type="video/mp4">
         Votre navigateur ne supporte pas la vidéo HTML5.
     </video>
 
-    <!-- Navigation -->
+    <!-- Navigation minimale en haut de page -->
     <nav class="navbar-minimal" id="navbar-minimal">
         <div class="nav-minimal-container">
             <div class="nav-logo-centered">
                 <a href="../index.html">
-                    <img src="../assets/Logo_degrade_PNG.png" alt="Dodje" class="logo-img">
+                    <img src="../assets/Logo_degrade_PNG.png" alt="Dodje - Application éducation financière gratuite" class="logo-img">
                 </a>
             </div>
         </div>
     </nav>
 
+    <!-- Navigation complète lors du scroll -->
+    <nav class="navbar navbar-scroll" id="navbar-scroll">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="../index.html">
+                    <img src="../assets/Logo_degrade_PNG.png" alt="Dodje - Application finance ludique pour apprendre investissement" class="logo-img">
+                </a>
+            </div>
+            <div class="nav-menu">
+                <a href="../index.html#about" class="nav-link">À propos</a>
+                <a href="../index.html#features" class="nav-link">Fonctionnalités</a>
+                <a href="../index.html#community" class="nav-link">Communauté</a>
+                <a href="../index.html#hero" class="cta-button nav-cta">Télécharger</a>
+            </div>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Ouvrir le menu">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Menu Mobile -->
+    <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
+    <div class="mobile-menu" id="mobile-menu">
+        <div class="mobile-menu-header">
+            <img src="../assets/Logo_degrade_PNG.png" alt="Dodje - App gratuite formation finance" class="logo-img">
+            <button class="mobile-menu-close" id="mobile-menu-close" type="button" aria-label="Fermer le menu">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="mobile-nav-links">
+            <a href="../index.html#about" class="nav-link">À propos</a>
+            <a href="../index.html#features" class="nav-link">Fonctionnalités</a>
+            <a href="../index.html#community" class="nav-link">Communauté</a>
+        </nav>
+        <div class="mobile-cta">
+            <a href="../index.html#hero" class="cta-button">Télécharger</a>
+        </div>
+    </div>
+
     <!-- Contenu principal -->
     <main class="legal-page">
         <div class="container">
             <div class="legal-content">
-                <h1>Conditions Générales d'Utilisation - Application Dodje</h1>
-                
-                <div class="legal-update">
-                    <p><strong>Dernière mise à jour :</strong> 23 septembre 2025</p>
-                </div>
+                <header class="legal-page-header">
+                    <p class="legal-eyebrow">Informations légales</p>
+                    <h1>Conditions générales <span class="legal-title-accent">d'utilisation</span></h1>
+                    <p class="legal-lead">Règles d'utilisation de l'application Dodje pour une expérience claire et respectueuse de tous.</p>
+                    <div class="legal-update">
+                        <p><strong>Dernière mise à jour :</strong> 23 septembre 2025</p>
+                    </div>
+                </header>
 
                 <section class="legal-section">
                     <h2>1. Informations générales</h2>
@@ -484,29 +526,29 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <img src="../assets/Logo_degrade_PNG.png" alt="Dodje" class="footer-logo">
-                    <p>L'application qui révolutionne l'éducation financière</p>
+                    <img src="../assets/Logo_degrade_PNG.png" alt="Dodje - Logo application finance éducative gratuite" class="footer-logo">
+                    <p>Dodje - la finance enfin expliquée simplement</p>
                 </div>
                 <div class="footer-section">
-                    <h4>Suis le mouvement</h4>
+                    <h4>Rejoins le mouvement</h4>
                     <div class="social-links">
-                        <a href="https://www.tiktok.com/@user453081960316645" class="social-link" target="_blank"><i class="fab fa-tiktok"></i></a>
-                        <a href="https://www.instagram.com/dodjeapp/" class="social-link" target="_blank"><i class="fab fa-instagram"></i></a>
-                        <a href="https://discord.gg/g3VH3Qtx8p" class="social-link" target="_blank"><i class="fab fa-discord"></i></a>
-                        <a href="https://x.com/DodjeApp" class="social-link" target="_blank"><i class="fab fa-twitter"></i></a>
+                        <a href="https://www.tiktok.com/@user453081960316645" class="social-link" target="_blank" rel="noopener noreferrer"><i class="fab fa-tiktok"></i></a>
+                        <a href="https://www.instagram.com/dodjeapp/" class="social-link" target="_blank" rel="noopener noreferrer"><i class="fab fa-instagram"></i></a>
+                        <a href="https://discord.gg/qn7cp4nVFh" class="social-link" target="_blank" rel="noopener noreferrer"><i class="fab fa-discord"></i></a>
+                        <a href="https://x.com/DodjeApp" class="social-link" target="_blank" rel="noopener noreferrer"><i class="fas fa-x"></i></a>
                     </div>
                 </div>
                 <div class="footer-section">
                     <h4>Liens utiles</h4>
                     <ul>
                         <li><a href="../conditions-utilisation.html/">Conditions d'utilisation</a></li>
-                        <li><a href="mailto:contact@dodje.xyz">contact@dodje.xyz</a></li>
                         <li><a href="../politique-confidentialite.html">Confidentialité</a></li>
+                        <li><a href="mailto:contact@dodje.xyz">contact@dodje.xyz</a></li>
                     </ul>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2025 Dodje. Tous droits réservés.</p>
+                <p>&copy; 2026 Dodje. Tous droits réservés.</p>
             </div>
         </div>
     </footer>
