@@ -115,8 +115,10 @@ document.addEventListener('DOMContentLoaded', function() {
         measurementId: "G-PTCZR9N93R"
     };
     
-    // Initialiser Firebase
-    firebase.initializeApp(firebaseConfig);
+    // Initialiser Firebase seulement sur les pages qui chargent le SDK.
+    if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+        firebase.initializeApp(firebaseConfig);
+    }
     // Note: Les fonctions de préinscription et d'authentification ont été retirées car l'application est maintenant disponible
     
     // ==================== EXISTING FUNCTIONALITY ====================
