@@ -218,7 +218,6 @@ body {
 .about,
 .features,
 .guides,
-.trust,
 .faq,
 .community,
 .footer {
@@ -232,7 +231,6 @@ body {
 .about::before,
 .features::before,
 .guides::before,
-.trust::before,
 .faq::before,
 .community::before,
 .footer::before {
@@ -1587,9 +1585,8 @@ body {
 }
 
 .guides,
-.trust,
 .faq {
-    padding: var(--space-24) 0;
+    padding: var(--space-16) 0;
 }
 
 .seo-section-header {
@@ -1627,8 +1624,7 @@ body {
 }
 
 .guide-card,
-.faq-item,
-.trust-card {
+.faq-item {
     background: rgba(17, 17, 17, 0.78);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-2xl);
@@ -1639,8 +1635,8 @@ body {
 
 .guide-card {
     display: block;
-    min-height: 260px;
-    padding: var(--space-8);
+    min-height: 220px;
+    padding: var(--space-6);
     color: var(--white);
     text-decoration: none;
     transition: var(--transition-all);
@@ -1661,39 +1657,10 @@ body {
 }
 
 .guide-card p,
-.faq-item p,
-.trust-list li {
+.faq-item p {
     color: var(--gray-300);
     font-size: var(--font-size-base);
     line-height: var(--line-height-relaxed);
-}
-
-.trust-card {
-    display: grid;
-    grid-template-columns: 1.35fr 0.85fr;
-    gap: var(--space-10);
-    align-items: start;
-    padding: var(--space-10);
-}
-
-.trust-list {
-    list-style: none;
-    display: grid;
-    gap: var(--space-3);
-}
-
-.trust-list strong {
-    color: var(--white);
-}
-
-.trust-list a {
-    color: var(--accent-light-green);
-    text-decoration: none;
-}
-
-.trust-list a:hover {
-    color: var(--secondary-green);
-    text-decoration: underline;
 }
 
 .faq-list {
@@ -1703,7 +1670,7 @@ body {
 }
 
 .faq-item {
-    padding: var(--space-8);
+    padding: var(--space-6);
 }
 
 .content-page {
@@ -6344,20 +6311,17 @@ a:focus {
 /* Mobile Responsive - Plus compact */
 @media (max-width: 640px) {
     .guides,
-    .trust,
     .faq {
         padding: var(--space-16) 0;
     }
 
     .guide-grid,
-    .faq-list,
-    .trust-card {
+    .faq-list {
         grid-template-columns: 1fr;
     }
 
     .guide-card,
     .faq-item,
-    .trust-card,
     .content-layout {
         padding: var(--space-6);
     }
