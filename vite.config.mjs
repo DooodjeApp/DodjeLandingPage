@@ -30,6 +30,9 @@ const cleanUrlsDev = () => ({
 })
 
 export default defineConfig({
+  // Use relative asset paths so the production build works both on dodje.fr
+  // and on a GitHub Pages project URL such as /DodjeLandingPage/.
+  base: './',
   plugins: [react(), cleanUrlsDev()],
   resolve: {
     // lottie_light avoids eval() in the full player — fixes Chrome CSP
