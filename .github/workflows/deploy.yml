@@ -34,8 +34,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Keep custom domain
-        run: cp CNAME dist/CNAME
+      - name: Prepare dist for GitHub Pages
+        run: |
+          cp CNAME dist/CNAME
+          touch dist/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
