@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://dodje.xyz/sitemap.xml
+Sitemap: https://dodje.fr/sitemap.xml
 
 # Optimisation pour les moteurs de recherche spécifiques
 User-agent: Googlebot
@@ -30,4 +30,3 @@ Disallow: /.git/
 Disallow: /package.json
 Disallow: /package-lock.json
 Disallow: /vite.config.js
-Disallow: /functions/

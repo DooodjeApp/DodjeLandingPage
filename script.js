@@ -67,20 +67,33 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!mobileMenu || !mobileMenuOverlay) return;
         mobileMenu.classList.add('active');
         mobileMenuOverlay.classList.add('active');
+        if (mobileMenuToggle) mobileMenuToggle.classList.add('is-active');
         document.body.style.overflow = 'hidden';
     }
-    
+
     // Fonction pour fermer le menu mobile
     function closeMobileMenu() {
         if (!mobileMenu || !mobileMenuOverlay) return;
         mobileMenu.classList.remove('active');
         mobileMenuOverlay.classList.remove('active');
+        if (mobileMenuToggle) mobileMenuToggle.classList.remove('is-active');
         document.body.style.overflow = 'auto';
     }
-    
+
+    // Toggle (open OR close depending on current state) — the burger button
+    // now also acts as the close button so the 3 bars morph into an X.
+    function toggleMobileMenu() {
+        if (!mobileMenu) return;
+        if (mobileMenu.classList.contains('active')) {
+            closeMobileMenu();
+        } else {
+            openMobileMenu();
+        }
+    }
+
     // Event listeners pour le menu mobile
     if (mobileMenuToggle) {
-        mobileMenuToggle.addEventListener('click', openMobileMenu);
+        mobileMenuToggle.addEventListener('click', toggleMobileMenu);
     }
     
     if (mobileMenuClose) {
@@ -104,51 +117,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // ==================== FIREBASE CONFIGURATION ====================
-    const firebaseConfig = {
-        apiKey: "AIzaSyDgDWiRJuwuG6jnqwKyIVlNEAiNTTu6jdQ",
-        authDomain: "doodje-455f9.firebaseapp.com",
-        projectId: "doodje-455f9",
-        storageBucket: "doodje-455f9.firebasestorage.app",
-        messagingSenderId: "612838674498",
-        appId: "1:612838674498:web:ba9f10dd9aa0d0a3d01ddb",
-        measurementId: "G-PTCZR9N93R"
-    };
-    
-    // Initialiser Firebase seulement sur les pages qui chargent le SDK.
-    if (typeof firebase !== 'undefined' && firebase.initializeApp) {
-        firebase.initializeApp(firebaseConfig);
-    }
-    // Note: Les fonctions de préinscription et d'authentification ont été retirées car l'application est maintenant disponible
-    
     // ==================== EXISTING FUNCTIONALITY ====================
     // Gestion de la vidéo d'arrière-plan
     const backgroundVideo = document.getElementById('background-video');
     if (backgroundVideo) {
-        // S'assurer que la vidéo démarre bien
-        backgroundVideo.play().catch(e => {
-            console.log('Autoplay bloqué:', e);
+        backgroundVideo.addEventListener('error', function() {
+            // Fail silently when the dev server is down or the asset is missing.
+            this.remove();
         });
-        
+
+        // S'assurer que la vidéo démarre bien
+        backgroundVideo.play().catch(() => {});
+
         // Redémarrer la vidéo quand elle se termine (double sécurité pour la boucle)
         backgroundVideo.addEventListener('ended', function() {
             this.currentTime = 0;
-            this.play();
-        });
-    }
-
-    // Gestion de la vidéo feature (Bourse monstre)
-    const featureVideo = document.querySelector('.feature-video');
-    if (featureVideo) {
-        // S'assurer que la vidéo démarre bien
-        featureVideo.play().catch(e => {
-            console.log('Autoplay bloqué pour la vidéo feature:', e);
-        });
-        
-        // Redémarrer la vidéo quand elle se termine (double sécurité pour la boucle)
-        featureVideo.addEventListener('ended', function() {
-            this.currentTime = 0;
-            this.play();
+            this.play().catch(() => {});
         });
     }
 
@@ -170,32 +154,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, { passive: true });
     }
 
-    // Phone mockup tilt effect
-    const phoneMockup = document.querySelector('.phone-mockup');
-    if (phoneMockup) {
-        phoneMockup.addEventListener('mousemove', function(e) {
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            
-            const rotateX = (y - centerY) / 20;
-            const rotateY = (centerX - x) / 20;
-            
-            requestAnimationFrame(() => {
-                this.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
-            });
-        });
-        
-        phoneMockup.addEventListener('mouseleave', function() {
-            requestAnimationFrame(() => {
-                this.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
-            });
-        });
-    }
-
     // Smooth scrolling for navigation links
     document.querySelectorAll('a[href^="#"]').forEach(link => {
         link.addEventListener('click', function(e) {
@@ -215,21 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Form interactions
-    const formInputs = document.querySelectorAll('input[type="email"], input[type="text"]');
     const allCtaButtons = document.querySelectorAll('.cta-button');
-
-    formInputs.forEach(input => {
-        input.addEventListener('focus', function() {
-            this.style.transform = 'scale(1.02)';
-            this.style.borderColor = 'var(--secondary-green)';
-        });
-        
-        input.addEventListener('blur', function() {
-            this.style.transform = 'scale(1)';
-            this.style.borderColor = 'var(--border-subtle)';
-        });
-    });
 
     // CTA button hover effects (pour les boutons qui ne sont pas "C'est parti")
     allCtaButtons.forEach(button => {
@@ -245,31 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-
-    // Intersection Observer for fade-in animations
-    const observerOptions = {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0.1
-    };
-
-    const observer = new IntersectionObserver(function(entries) {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, observerOptions);
-
-    // Observe elements for animation
-    const animatedElements = document.querySelectorAll('.pillar-card, .feature-card, .benefit, .time-unit');
-    animatedElements.forEach(element => {
-        element.style.opacity = '0';
-        element.style.transform = 'translateY(30px)';
-        element.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
-        observer.observe(element);
-    });
 
     // About video - contrôles natifs uniquement
     const aboutVideo = document.querySelector('.about-video');
@@ -288,32 +207,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('About video loaded successfully');
         });
     }
-
-    // Learning path step interactions
-    const stepCircles = document.querySelectorAll('.step-circle');
-    stepCircles.forEach(circle => {
-        circle.addEventListener('mouseenter', function() {
-            if (this.classList.contains('completed') || this.classList.contains('current')) {
-                this.style.transform = 'scale(1.1)';
-            }
-        });
-        
-        circle.addEventListener('mouseleave', function() {
-            this.style.transform = 'scale(1)';
-        });
-    });
-
-    // Card hover effects
-    const cards = document.querySelectorAll('.pillar-card, .feature-card');
-    cards.forEach(card => {
-        card.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-8px) scale(1.02)';
-        });
-        
-        card.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0) scale(1)';
-        });
-    });
 
     // Keyboard navigation improvements
     document.addEventListener('keydown', function(e) {
